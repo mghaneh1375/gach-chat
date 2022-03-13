@@ -104,6 +104,8 @@ function getSpecificChats(receiverId, mode) {
 
     var idx = isInCacheByRecv(receiverId)
     if(idx !== -1) {
+        chatId = chats[idx].chatId;
+        sendHeart();
         renderThisChat(chats[idx], "FIFO", -1);
         return;
     }
@@ -123,6 +125,7 @@ function getSpecificChats(receiverId, mode) {
                 chat.mode = mode;
                 chats.push(chat);
                 renderThisChat(chat, "FIFO", -1);
+                sendHeart();
                 console.log(chats);
             }
         }
