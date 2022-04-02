@@ -145,6 +145,7 @@ public class ChatController extends Router {
                             .put("newMsgs", 0)
                     );
 
+                    excludes.add((ObjectId) pairValue.getKey());
                 }
 
                 if (!excludes.contains((ObjectId) pairValue.getValue())) {
@@ -156,6 +157,8 @@ public class ChatController extends Router {
                             .put("mode", "peer")
                             .put("newMsgs", 0)
                     );
+
+                    excludes.add((ObjectId) pairValue.getValue());
 
                 }
 
@@ -421,10 +424,14 @@ public class ChatController extends Router {
                             )
                                 return;
 
-                            if (chatRoom.getObjectId("sender_id").equals(senderId))
+                            if (chatRoom.getObjectId("sender_id").equals(senderId)) {
                                 chatRoom.put("last_seen", curr);
-                            else
+                                chatRoom.put("new_msgs", 0);
+                            }
+                            else {
                                 chatRoom.put("last_seen_rev", curr);
+                                chatRoom.put("new_msgs_rev", 0);
+                            }
 
                         } else {
 
@@ -433,6 +440,7 @@ public class ChatController extends Router {
                             if (doc == null)
                                 return;
 
+                            doc.put("seen", chatRoom.getInteger("new_msgs"));
                             doc.put("last_seen", curr);
                         }
 
@@ -584,7 +592,7 @@ public class ChatController extends Router {
                                     continue;
 
                                 if(curr - doc.getLong("last_seen") <= UPDATE_BACK_PERIOD_MSEC) {
-                                    doc.put("seen", doc.getInteger("seen") + 1);
+                                    doc.put("seen", chatRoom.getInteger("new_msgs"));
                                     continue;
                                 }
 
@@ -667,12 +675,15 @@ public class ChatController extends Router {
 
         List<Document> passed = user.getList("passed", Document.class);
         ArrayList<Object> classAndTeacherIds = new ArrayList<>();
+        ArrayList<ObjectId> courseIds = new ArrayList<>();
+        int today = Utility.getToday();
 
         for (Document itr : passed) {
 
             if (!itr.containsKey("class_id") ||
                     itr.containsKey("success") ||
-                    itr.containsKey("final_result")
+                    itr.containsKey("final_result") ||
+                    courseIds.contains(itr.getObjectId("course_id"))
             )
                 continue;
 
@@ -681,17 +692,25 @@ public class ChatController extends Router {
             if (theClass == null || !theClass.containsKey("teacher_id"))
                 continue;
 
+            if(theClass.getInteger("start") > today ||
+                    theClass.getInteger("end") < today
+            )
+                continue;
+
             Document teacher = userRepository.findById(theClass.getObjectId("teacher_id"));
             if (teacher == null)
                 continue;
 
-            classAndTeacherIds.add(
-                    new PairValue(
-                            theClass.getObjectId("_id"),
-                            teacher.getObjectId("_id")
-                    )
+            PairValue p = new PairValue(
+                    theClass.getObjectId("_id"),
+                    teacher.getObjectId("_id")
             );
 
+            if(classAndTeacherIds.contains(p))
+                continue;
+
+            courseIds.add(itr.getObjectId("course_id"));
+            classAndTeacherIds.add(p);
         }
 
         return classAndTeacherIds;
@@ -699,10 +718,12 @@ public class ChatController extends Router {
 
     private ArrayList<Object> getCurrentClassIds(ObjectId teacherId) {
 
+        int today = Utility.getToday();
+
         ArrayList<Document> docs = classRepository.find(and(
-                eq("teacher_id", teacherId)
-//                lt("start", curr),
-//                gt("end", curr)
+                eq("teacher_id", teacherId),
+                lt("start", today),
+                gt("end", today)
         ), new BasicDBObject("_id", 1));
 
         ArrayList<Object> classes = new ArrayList<>();

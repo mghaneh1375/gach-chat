@@ -15,7 +15,7 @@ var subId;
 var token = null;
 var userId = null;
 var recvId = null;
-// var prefix = "http://192.168.0.106:8080/";
+// var prefix = "http://192.168.0.145:8088/";
 var prefix = "http://185.239.106.26:8088/";
 var chatId = null;
 var chats = [];
@@ -102,11 +102,11 @@ function getSpecificChats(receiverId, mode) {
     $(".contact").removeClass('selected-contact');
     $("#chat_" + receiverId).addClass('selected-contact');
 
-    var idx = isInCacheByRecv(receiverId)
+    var idx = isInCacheByRecv(receiverId);
     if(idx !== -1) {
         chatId = chats[idx].chatId;
         sendHeart();
-        renderThisChat(chats[idx], "FIFO", -1);
+        renderThisChat(chats[idx], "FIFO", -1, -1);
         return;
     }
 
@@ -124,7 +124,7 @@ function getSpecificChats(receiverId, mode) {
                 chat.receiverId = receiverId;
                 chat.mode = mode;
                 chats.push(chat);
-                renderThisChat(chat, "FIFO", -1);
+                renderThisChat(chat, "FIFO", -1, -1);
                 sendHeart();
                 console.log(chats);
             }
@@ -133,7 +133,7 @@ function getSpecificChats(receiverId, mode) {
     });
 }
 
-function renderThisChat(chat, readMode, startIdx, limit = -1) {
+function renderThisChat(chat, readMode, startIdx, limit) {
 
     chatId = chat.chatId;
     recvId = chat.receiverId;
@@ -277,13 +277,13 @@ function isAuth(token) {
         url: prefix + 'api/user/isAuth',
         headers: {
             "Authorization": "Bearer " + token,
-            "Accept": "application/json",
+            "Accept": "application/json"
         },
         success: function (res) {
 
             if(res.status === "ok") {
                 userId = res.id;
-
+                $("#user_name").append(res.name);
                 var socket = new SockJS('/ws');
                 stompClient = Stomp.over(socket);
 
@@ -458,6 +458,8 @@ $(document).ready(function () {
             getAnotherPage();
     });
 
-    // login("mghaneh1375@ut.ac.ir");
-    // 9129270549
+    // 9122835126 : teacher
+    // 2248089
+    // 9127222752
+    // 9357358999
 });

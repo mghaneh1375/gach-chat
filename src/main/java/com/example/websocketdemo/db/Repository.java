@@ -48,6 +48,9 @@ public class Repository {
                 continue;
 
             Document doc = (Document) cache.getValue();
+            if(output.contains(doc))
+                continue;
+
             boolean allowAdd = false;
 
             for(Document filter : filters) {

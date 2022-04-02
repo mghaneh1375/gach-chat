@@ -40,6 +40,7 @@ public class UserAPIRoutes extends Router {
 
         return new JSONObject()
                 .put("id", user.getObjectId("_id").toString())
+                .put("name", user.getString("name_fa") + " " + user.getString("last_name_fa"))
                 .put("status", "ok")
                 .toString();
     }

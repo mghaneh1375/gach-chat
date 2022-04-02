@@ -35,75 +35,82 @@ public class ChatRoomRepository extends Common {
 
         for(Object itr : currentClassAndTeachers) {
 
+            Bson filter;
+
             if(itr instanceof PairValue) {
 
                 PairValue pairValue = (PairValue) itr;
-                constraintsBson.add(
-                        and(
-                                eq("mode", "peer"),
-                                eq("sender_id", userId),
-                                eq("receiver_id", pairValue.getValue())
-                        )
+
+                filter = and(
+                        eq("mode", "peer"),
+                        eq("sender_id", userId),
+                        eq("receiver_id", pairValue.getValue())
                 );
 
-                constraints.add(new Document("mode", "peer")
-                        .append("sender_id", userId)
-                        .append("receiver_id", pairValue.getValue()));
+                if(!constraintsBson.contains(filter)) {
+                    constraintsBson.add(filter);
+                    constraints.add(new Document("mode", "peer")
+                            .append("sender_id", userId)
+                            .append("receiver_id", pairValue.getValue()));
+                }
 
-
-                constraintsBson.add(
-                        and(
-                                eq("mode", "peer"),
-                                eq("receiver_id", userId),
-                                eq("sender_id", pairValue.getValue())
-                        )
+                filter = and(
+                        eq("mode", "peer"),
+                        eq("receiver_id", userId),
+                        eq("sender_id", pairValue.getValue())
                 );
 
-                constraints.add(new Document("mode", "peer")
-                        .append("receiver_id", userId)
-                        .append("sender_id", pairValue.getValue()));
+                if(!constraintsBson.contains(filter)) {
+                    constraintsBson.add(filter);
+                    constraints.add(new Document("mode", "peer")
+                            .append("receiver_id", userId)
+                            .append("sender_id", pairValue.getValue()));
+                }
 
-                constraintsBson.add(
-                        and(
-                                eq("mode", "group"),
-                                eq("receiver_id", pairValue.getKey())
-                        )
+                filter = and(
+                        eq("mode", "group"),
+                        eq("receiver_id", pairValue.getKey())
                 );
 
-                constraints.add(new Document("mode", "group")
-                        .append("receiver_id", pairValue.getKey()));
+                if(!constraintsBson.contains(filter)) {
+                    constraintsBson.add(filter);
+                    constraints.add(new Document("mode", "group")
+                            .append("receiver_id", pairValue.getKey()));
+                }
             }
             else {
-                constraintsBson.add(
-                        and(
-                                eq("mode", "peer"),
-                                eq("sender_id", userId)
-                        )
+
+                filter = and(
+                        eq("mode", "peer"),
+                        eq("sender_id", userId)
                 );
 
-                constraints.add(new Document("mode", "peer")
-                        .append("sender_id", userId));
+                if(!constraintsBson.contains(filter)) {
+                    constraintsBson.add(filter);
+                    constraints.add(new Document("mode", "peer")
+                            .append("sender_id", userId));
+                }
 
+                filter = and(
+                        eq("mode", "peer"),
+                        eq("receiver_id", userId)
+                );
+                if(!constraintsBson.contains(filter)) {
+                    constraintsBson.add(filter);
+                    constraints.add(new Document("mode", "peer")
+                            .append("receiver_id", userId));
+                }
 
-                constraintsBson.add(
-                        and(
-                                eq("mode", "peer"),
-                                eq("receiver_id", userId)
-                        )
+                filter = and(
+                        eq("mode", "group"),
+                        eq("receiver_id", itr)
                 );
 
-                constraints.add(new Document("mode", "peer")
-                        .append("receiver_id", userId));
-
-                constraintsBson.add(
-                        and(
-                                eq("mode", "group"),
-                                eq("receiver_id", itr)
-                        )
-                );
-
-                constraints.add(new Document("mode", "group")
-                        .append("receiver_id", itr));
+                if(!constraintsBson.contains(filter)) {
+                    constraintsBson.add(filter);
+                    constraints.add(new Document("mode", "group")
+                            .append("receiver_id", itr));
+                }
             }
         }
 
@@ -118,14 +125,21 @@ public class ChatRoomRepository extends Common {
         if(excludes.size() == currentClassAndTeachers.size() * 2)
             return output;
 
-        output.addAll(chatRoomRepository.find(and(
-                        nin("_id", excludes),
-                        or(constraintsBson)
+        ArrayList<Document> docs = chatRoomRepository.find(and(
+                nin("_id", excludes),
+                or(constraintsBson)
                 ), new BasicDBObject("sender_id", 1).append("receiver_id", 1)
                         .append("new_msgs", 1).append("new_msgs_rev", 1)
                         .append("mode", 1).append("persons", 1)
-                )
         );
+
+        for (Document doc : docs) {
+
+            if(output.contains(doc))
+                continue;
+
+            output.add(doc);
+        }
 
         return output;
     }
