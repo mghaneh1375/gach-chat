@@ -24,8 +24,9 @@ public class CorsFilter implements Filter {
                 (request.getHeader("Origin") != null) ?
                     request.getHeader("Origin") : request.getHeader("Referer"));
 
+	response.setHeader("Access-Control-Allow-Credentials", "true");
         response.setHeader("Access-Control-Allow-Methods", "POST, PUT, GET, OPTIONS, DELETE");
-        response.setHeader("Access-Control-Allow-Headers", "Authorization, Cache-Control, Content-Type");
+        response.setHeader("Access-Control-Allow-Headers", "Authorization, Cache-Control, Content-Type, Origin, X-Requested-With, Accept");
         response.setHeader("Access-Control-Max-Age", "3600");
 //
 //        //SEND OK or validate
