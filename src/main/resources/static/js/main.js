@@ -246,7 +246,7 @@ function login(username) {
         url: prefix + 'api/user/signIn',
         headers: {
             "Content-Type": "application/json",
-            "Accept": "application/json",
+            "Accept": "application/json"
         },
         data: JSON.stringify({
             username: username,
@@ -259,7 +259,7 @@ function login(username) {
                 window.localStorage.token = token;
                 userId = res.id;
 
-                var socket = new SockJS('/ws');
+                var socket = new SockJS(prefix + "ws");
                 stompClient = Stomp.over(socket);
 
                 stompClient.connect({}, heartBeatHandler, onError);
@@ -284,7 +284,8 @@ function isAuth(token) {
             if(res.status === "ok") {
                 userId = res.id;
                 $("#user_name").append(res.name);
-                var socket = new SockJS('/ws');
+
+                var socket = new SockJS(prefix + "ws");
                 stompClient = Stomp.over(socket);
 
                 stompClient.connect({}, heartBeatHandler, onError);
@@ -459,7 +460,11 @@ $(document).ready(function () {
     });
 
     // 9122835126 : teacher
-    // 2248089
-    // 9127222752
+    // 2248089   612b60bb12cfce6c2cb1535a
+    // 9127222752 61349ea7384cb720593b757b
     // 9357358999
+
+
+    // 61324bb10847d93d5125df6f    9122630845
+    // 613237950847d93d5125df39
 });
