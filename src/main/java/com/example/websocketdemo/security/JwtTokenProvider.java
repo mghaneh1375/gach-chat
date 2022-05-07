@@ -27,7 +27,7 @@ public class JwtTokenProvider {
      * THIS IS NOT A SECURE PRACTICE! For simplicity, we are storing a static key here. Ideally, in a
      * microservices environment, this key would be kept on a config-server.
      */
-    final static private String secretKey = "Salam";
+    final static private String secretKey = "{MIP0kK^PGU;l/{";
 
     @Value("${security.jwt.token.expire-length:3600000}")
 
