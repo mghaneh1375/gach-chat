@@ -31,9 +31,9 @@ public class CorsFilter implements Filter {
 //
 //        //SEND OK or validate
         if ("OPTIONS".equalsIgnoreCase(((HttpServletRequest) req).getMethod())) {
-//            System.out.println("origin " + ((HttpServletRequest) req).getHeader("Origin"));
+
 //            if(((HttpServletRequest) req).getHeader("Origin") == null ||
-//                !((HttpServletRequest) req).getHeader("Origin").equals("http://echeck.ir"))
+//                !((HttpServletRequest) req).getHeader("Origin").equals("https://okft.org"))
 //            {
 //                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
 //                return;
@@ -41,9 +41,8 @@ public class CorsFilter implements Filter {
 
             response.setStatus(HttpServletResponse.SC_OK);
         } else {
-//            System.out.println("referer " + ((HttpServletRequest) req).getHeader("Referer"));
 //            if(((HttpServletRequest) req).getHeader("Referer") == null ||
-//                !((HttpServletRequest) req).getHeader("Referer").contains("http://echeck.ir"))
+//                !((HttpServletRequest) req).getHeader("Referer").contains("https://okft.org"))
 //            {
 //                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
 //                return;

@@ -14,7 +14,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry
                 .addEndpoint("/ws")
-//                .setAllowedOrigins("http://192.168.0.145")
+//                .setAllowedOrigins("https://okft.org")
 //                .setAllowedOrigins("http://185.239.106.26")
 //                .setAllowedOrigins("http://localhost:3000")
 //                .setAllowedOrigins("http://localhost:8088")

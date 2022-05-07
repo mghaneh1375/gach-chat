@@ -23,10 +23,12 @@ public class JwtTokenFilter extends OncePerRequestFilter {
 
         private String token;
         private long issue;
+        private Authentication authentication;
 
-        ValidateToken(String token) {
+        ValidateToken(String token, Authentication authentication) {
             this.token = token;
             this.issue = System.currentTimeMillis();
+            this.authentication = authentication;
         }
 
         public boolean isValidateYet() {
@@ -42,8 +44,8 @@ public class JwtTokenFilter extends OncePerRequestFilter {
     }
 
     private JwtTokenProvider jwtTokenProvider;
-    public static final ArrayList<ValidateToken> validateTokens = new ArrayList<>();
-    public static final ArrayList<PairValue> blackListTokens = new ArrayList<>();
+    private static final ArrayList<ValidateToken> validateTokens = new ArrayList<>();
+    private static final ArrayList<PairValue> blackListTokens = new ArrayList<>();
 
     public static void removeTokenFromCache(String token) {
 
@@ -54,10 +56,6 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                 return;
             }
         }
-    }
-
-    public JwtTokenFilter(JwtTokenProvider jwtTokenProvider) {
-        this.jwtTokenProvider = jwtTokenProvider;
     }
 
     public JwtTokenFilter() {
@@ -97,7 +95,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
             if (token != null && jwtTokenProvider.validateToken(token)) {
                 Authentication auth = jwtTokenProvider.getAuthentication(token);
                 SecurityContextHolder.getContext().setAuthentication(auth);
-                validateTokens.add(new ValidateToken(token));
+                validateTokens.add(new ValidateToken(token, auth));
                 return true;
             }
         } catch (CustomException ex) {
@@ -108,20 +106,21 @@ public class JwtTokenFilter extends OncePerRequestFilter {
         return false;
     }
 
-    public boolean isAuth(String token) {
+    public Authentication isAuth(String token) {
 
         if(token != null) {
 
             for (PairValue blackListToken : blackListTokens) {
                 if (blackListToken.getKey().equals(token))
-                    return false;
+                    return null;
             }
 
             for (ValidateToken v : validateTokens) {
+
                 if(v.equals(token)) {
 
                     if(v.isValidateYet())
-                        return true;
+                        return v.authentication;
                     else
                         validateTokens.remove(v);
 
@@ -134,14 +133,14 @@ public class JwtTokenFilter extends OncePerRequestFilter {
             if (token != null && jwtTokenProvider.validateToken(token)) {
                 Authentication auth = jwtTokenProvider.getAuthentication(token);
                 SecurityContextHolder.getContext().setAuthentication(auth);
-                validateTokens.add(new ValidateToken(token));
-                return true;
+                validateTokens.add(new ValidateToken(token, auth));
+                return auth;
             }
         } catch (CustomException ex) {
             SecurityContextHolder.clearContext();
-            return false;
+            return null;
         }
 
-        return false;
+        return null;
     }
 }

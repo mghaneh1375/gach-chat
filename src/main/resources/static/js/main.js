@@ -15,11 +15,13 @@ var subId;
 var token = null;
 var userId = null;
 var recvId = null;
-// var prefix = "http://192.168.0.145:8088/";
-var prefix = "http://185.239.106.26:8088/";
+var prefix = "http://127.0.0.1:8088/";
+// var prefix = "http://185.239.106.26:8088/";
 var chatId = null;
 var chats = [];
 var PER_PAGE = 10;
+
+var timer;
 
 function isInCache(chatId) {
 
@@ -52,7 +54,7 @@ function isInCacheMsgs(msgs, chatId) {
 }
 
 function startChat() {
-    subId = stompClient.subscribe('/chat/' + chatId, onMessageReceived).id;
+    subId = stompClient.subscribe('/chat/' + chatId, onMessageReceived, {'group-subscribe': true, 'token': token}).id;
 }
 
 function buildMsg(chat, chatId) {
@@ -210,12 +212,12 @@ function buildChat(chat) {
 
 function heartBeatHandler() {
 
-    stompClient.subscribe("/chat/" + userId, onNewMessageReceived);
+    stompClient.subscribe("/chat/" + userId, onNewMessageReceived, {'self-subscribe': true, 'token': token});
     connectingElement.classList.add('hidden');
 
     sendHeart();
 
-    setInterval(function () {
+    timer = setInterval(function () {
         sendHeart();
     }, 5000);
 
@@ -259,7 +261,11 @@ function login(username) {
                 window.localStorage.token = token;
                 userId = res.id;
 
-                var socket = new SockJS(prefix + "ws");
+                var authToken = 'R3YKZFKBVi';
+
+                document.cookie = 'X-Authorization=' + authToken + '; path=/';
+
+                var socket = new SockJS(prefix + "ws", ["token", token]);
                 stompClient = Stomp.over(socket);
 
                 stompClient.connect({}, heartBeatHandler, onError);
@@ -288,7 +294,7 @@ function isAuth(token) {
                 var socket = new SockJS(prefix + "ws");
                 stompClient = Stomp.over(socket);
 
-                stompClient.connect({}, heartBeatHandler, onError);
+                stompClient.connect({"token": token}, heartBeatHandler, onError);
             }
 
         }
@@ -307,10 +313,9 @@ function connect(event) {
     event.preventDefault();
 }
 
-
 function onError(error) {
-    connectingElement.textContent = 'Could not connect to WebSocket server. Please refresh this page to try again!';
-    connectingElement.style.color = 'red';
+    clearInterval(timer);
+    alert(error);
 }
 
 

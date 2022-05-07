@@ -18,23 +18,21 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Stack;
 
 import static com.example.websocketdemo.WebsocketDemoApplication.*;
-import static com.example.websocketdemo.utility.Statics.*;
+import static com.example.websocketdemo.utility.Statics.JSON_NOT_ACCESS;
+import static com.example.websocketdemo.utility.Statics.JSON_NOT_VALID_PARAMS;
 import static com.mongodb.client.model.Filters.*;
 
 @Controller
@@ -57,8 +55,7 @@ public class ChatController extends Router {
 
         ArrayList<Object> currentClassAndTeachers = Authorization.isTeacher(user.getString("access")) ?
                 getCurrentClassIds(senderId) :
-                getCurrentClassAndTeacherIds(user)
-        ;
+                getCurrentClassAndTeacherIds(user);
 
         ArrayList<Document> chats =
                 chatRoomRepository.getBySenderOrReceiver(senderId, currentClassAndTeachers);
@@ -104,8 +101,7 @@ public class ChatController extends Router {
                         chat.getInteger("new_msgs") :
                         chat.getInteger("new_msgs_rev")
                 );
-            }
-            else {
+            } else {
 
                 Document doc = Utility.searchInDocumentsKeyVal(chat.getList("persons", Document.class),
                         "user_id", senderId
@@ -165,8 +161,7 @@ public class ChatController extends Router {
             }
 
 
-        }
-        else {
+        } else {
             for (Object itr : currentClassAndTeachers) {
 
                 if (!excludes.contains((ObjectId) itr)) {
@@ -223,11 +218,10 @@ public class ChatController extends Router {
 
             if (!allow)
                 return JSON_NOT_ACCESS;
-        }
-        else if(mode.equals("group")) {
+        } else if (mode.equals("group")) {
 
             ArrayList<Object> currentClasses = getCurrentClassIds(senderId);
-            if(!currentClasses.contains(receiverId))
+            if (!currentClasses.contains(receiverId))
                 return JSON_NOT_ACCESS;
 
         }
@@ -240,7 +234,7 @@ public class ChatController extends Router {
 
             ObjectId chatId;
 
-            if(mode.equals("peer")) {
+            if (mode.equals("peer")) {
                 chatId = chatRoomRepository.insertOneWithReturnId(
                         new Document("chats", new ArrayList<>())
                                 .append("last_seen", curr)
@@ -252,17 +246,16 @@ public class ChatController extends Router {
                                 .append("sender_id", senderId)
                                 .append("receiver_id", receiverId)
                 );
-            }
-            else {
+            } else {
 
                 List<Document> persons = new ArrayList<>();
                 Document theClass = classRepository.findById(receiverId);
                 List<Document> students = theClass.getList("students", Document.class);
 
-                for(Document student : students)
+                for (Document student : students)
                     persons.add(new Document("user_id", student.getObjectId("_id"))
                             .append("seen", 0)
-                            .append("last_seen", senderId.equals(student.getObjectId("_id")) ? curr : (long)-1)
+                            .append("last_seen", senderId.equals(student.getObjectId("_id")) ? curr : (long) -1)
                     );
 
                 persons.add(new Document("user_id", theClass.getObjectId("teacher_id"))
@@ -321,7 +314,7 @@ public class ChatController extends Router {
         List<Document> chats = chatRoom.getList("chats", Document.class);
         JSONArray jsonArray = new JSONArray();
 
-        if(chats.size() == 0)
+        if (chats.size() == 0)
             return Utility.generateSuccessMsg("data", new JSONObject()
                     .put("chatId", chatRoom.getObjectId("_id").toString())
                     .put("chats", jsonArray)
@@ -334,13 +327,13 @@ public class ChatController extends Router {
 
             Document chat = chats.get(i);
 
-            if(chat.getLong("created_at") >= lastCreatedAt)
+            if (chat.getLong("created_at") >= lastCreatedAt)
                 continue;
 
             boolean amISender = chat.getObjectId("sender").equals(senderId);
             Document sender = null;
 
-            if(!amISender)
+            if (!amISender)
                 sender = userRepository.findById(chat.getObjectId("sender"));
 
             JSONObject jsonObject = new JSONObject()
@@ -351,20 +344,20 @@ public class ChatController extends Router {
 //                    .put("status", chat.getString("status"))
                     ;
 
-            if(sender != null)
+            if (sender != null)
                 jsonObject.put("sender",
                         sender.getString("name_fa") + " " + sender.getString("last_name_fa")
                 );
 
             stack.push(jsonObject);
 
-            if(stack.size() == PER_PAGE)
+            if (stack.size() == PER_PAGE)
                 break;
         }
 
         int stackSize = stack.size();
 
-        for(int i = 0; i < stackSize; i++)
+        for (int i = 0; i < stackSize; i++)
             jsonArray.put(stack.pop());
 
         update(curr, chatRoom);
@@ -379,16 +372,17 @@ public class ChatController extends Router {
     @MessageMapping("/chat")
     public void processMessage(@Payload String message) {
 
+        System.out.println(message);
         try {
             JSONObject jsonObject = new JSONObject(message);
 
-            if (!EnumValidatorImp.isValid(
+            if (!jsonObject.has("type") || !EnumValidatorImp.isValid(
                     jsonObject.getString("type").toLowerCase(),
-                    MessageType.class)
-            )
+                    MessageType.class
+            ))
                 return;
 
-            Document user = getUserWithOutCheckCompleteness(jsonObject.getString("token"));
+            Document user = getUserWithToken(jsonObject.getString("token"), null);
 
             ObjectId senderId = user.getObjectId("_id");
             Document chatRoom;
@@ -427,8 +421,7 @@ public class ChatController extends Router {
                             if (chatRoom.getObjectId("sender_id").equals(senderId)) {
                                 chatRoom.put("last_seen", curr);
                                 chatRoom.put("new_msgs", 0);
-                            }
-                            else {
+                            } else {
                                 chatRoom.put("last_seen_rev", curr);
                                 chatRoom.put("new_msgs_rev", 0);
                             }
@@ -520,8 +513,7 @@ public class ChatController extends Router {
 
 //                        System.out.println(amIStarter + " " + lastSeenTarget);
 
-                    }
-                    else {
+                    } else {
 
                         persons = chatRoom.getList("persons", Document.class);
                         Document doc = Utility.searchInDocumentsKeyVal(persons, "user_id", senderId);
@@ -540,7 +532,7 @@ public class ChatController extends Router {
                             .append("sender", senderId)
                             .append("_id", newChatId)
 //                            .append("status", ChatMessage.MessageStatus.RECEIVED.toString())
-                    ;
+                            ;
 
                     chats.add(chat);
 
@@ -561,7 +553,7 @@ public class ChatController extends Router {
                         else
                             chatRoom.put("new_msgs", chatRoom.getInteger("new_msgs") + 1);
 
-                        if(chatRoom.getString("mode").equals("peer")) {
+                        if (chatRoom.getString("mode").equals("peer")) {
 
                             Document chatPresenceTmp = chatPresenceRepository.findBySecKey(
                                     amIStarter ? chatRoom.getObjectId("receiver_id") :
@@ -583,15 +575,14 @@ public class ChatController extends Router {
                                         chatMessage
                                 );
                             }
-                        }
-                        else if(persons != null) {
+                        } else if (persons != null) {
 
-                            for(Document doc : persons) {
+                            for (Document doc : persons) {
 
-                                if(doc.getObjectId("user_id").equals(senderId))
+                                if (doc.getObjectId("user_id").equals(senderId))
                                     continue;
 
-                                if(curr - doc.getLong("last_seen") <= UPDATE_BACK_PERIOD_MSEC) {
+                                if (curr - doc.getLong("last_seen") <= UPDATE_BACK_PERIOD_MSEC) {
                                     doc.put("seen", chatRoom.getInteger("new_msgs"));
                                     continue;
                                 }
@@ -692,7 +683,7 @@ public class ChatController extends Router {
             if (theClass == null || !theClass.containsKey("teacher_id"))
                 continue;
 
-            if(theClass.getInteger("start") > today ||
+            if (theClass.getInteger("start") > today ||
                     theClass.getInteger("end") < today
             )
                 continue;
@@ -706,7 +697,7 @@ public class ChatController extends Router {
                     teacher.getObjectId("_id")
             );
 
-            if(classAndTeacherIds.contains(p))
+            if (classAndTeacherIds.contains(p))
                 continue;
 
             courseIds.add(itr.getObjectId("course_id"));
@@ -727,7 +718,7 @@ public class ChatController extends Router {
         ), new BasicDBObject("_id", 1));
 
         ArrayList<Object> classes = new ArrayList<>();
-        for(Document doc : docs)
+        for (Document doc : docs)
             classes.add(doc.getObjectId("_id"));
 
         return classes;
