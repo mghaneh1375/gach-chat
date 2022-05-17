@@ -14,12 +14,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry
                 .addEndpoint("/ws")
-                .setAllowedOrigins("https://okft.org")
+//                .setAllowedOrigins("https://okft.org")
 //                .setAllowedOrigins("http://185.239.106.26")
 //                .setAllowedOrigins("http://localhost:3000")
 //                .setAllowedOrigins("http://localhost:8088")
 //                .setAllowedOrigins("http://127.0.0.1:5500")
-//		.setAllowedOriginPatterns("*")
+		.setAllowedOriginPatterns("*")
                 .withSockJS();
     }
 
