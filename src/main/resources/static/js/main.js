@@ -12,12 +12,14 @@ var stompClient = null;
 var username = null;
 var subId;
 
+var authToken = null;
 var token = null;
 var userId = null;
 var recvId = null;
-// var prefix = "http://127.0.0.1:8088/";
+var loginUrl = "http://127.0.0.1:8080/";
+var prefix = "http://127.0.0.1:8088/";
 // var prefix = "http://185.239.106.26:8088/";
-var prefix = 'https://chat.okft.org/';
+// var prefix = 'https://chat.okft.org/';
 var chatId = null;
 var chats = [];
 var PER_PAGE = 10;
@@ -246,7 +248,7 @@ function login(username) {
 
     $.ajax({
         type: 'post',
-        url: prefix + 'api/user/signIn',
+        url: loginUrl + 'api/user/chatSignIn',
         headers: {
             "Content-Type": "application/json",
             "Accept": "application/json"
@@ -258,22 +260,65 @@ function login(username) {
         success: function (res) {
 
             if(res.status === "ok") {
-                token = res.token;
-                window.localStorage.token = token;
+                authToken = res.token;
+                window.localStorage.token = authToken;
                 userId = res.id;
-
-                var authToken = 'R3YKZFKBVi';
-
-                document.cookie = 'X-Authorization=' + authToken + '; path=/';
-
-                var socket = new SockJS(prefix + "ws", ["token", token]);
-                stompClient = Stomp.over(socket);
-
-                stompClient.connect({}, heartBeatHandler, onError);
+                getSocketToken(null);
             }
+            else
+                alert("wrong data");
 
         }
     });
+
+}
+
+function getSocketToken(oldToken) {
+
+    var data;
+
+    if(oldToken == null)
+        data = {
+            "captcha": "sample"
+        };
+    else
+        data = {
+            "captcha": "sample",
+            "oldToken": oldToken
+        };
+
+    $.ajax({
+        url: prefix + "api/getToken",
+        method: 'post',
+        headers: {
+            "authorization": "Bearer " + authToken,
+            "content-type": "application/json",
+            "accept": "application/json"
+        },
+        data: JSON.stringify(data),
+        success: function (res) {
+
+            console.log(res);
+
+            if(res.status !== "ok") {
+                alert(res.msg);
+                return;
+            }
+
+            token = res.token;
+            var validityDuration = res.validityDuration;
+
+            // var authToken = 'R3YKZFKBVi';
+            // document.cookie = 'X-Authorization=' + token + '; path=/';
+
+            var socket = new SockJS(prefix + "ws", ["token", token]);
+            stompClient = Stomp.over(socket);
+
+            stompClient.connect({}, heartBeatHandler, onError);
+
+            // setTimeout(getSocketToken(token), validityDuration);
+        }
+    })
 
 }
 
@@ -289,13 +334,14 @@ function isAuth(token) {
         success: function (res) {
 
             if(res.status === "ok") {
+                authToken = token;
                 userId = res.id;
                 $("#user_name").append(res.name);
-
-                var socket = new SockJS(prefix + "ws");
-                stompClient = Stomp.over(socket);
-
-                stompClient.connect({"token": token}, heartBeatHandler, onError);
+                getSocketToken(null);
+            }
+            else {
+                $("#chat-page").addClass("hidden");
+                $("#username-page").removeClass("hidden");
             }
 
         }
@@ -380,7 +426,7 @@ function onNewMessageReceived(payload) {
             "amISender": chatMessage.senderId == userId,
             "createdAt": chatMessage.timestamp,
             "id": chatMessage.id
-        }
+        };
 
         if(!msg.amISender)
             msg.sender = chatMessage.sender;

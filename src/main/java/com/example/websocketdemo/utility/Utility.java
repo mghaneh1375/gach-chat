@@ -114,6 +114,17 @@ public class Utility {
                 .toString();
     }
 
+    public static String generateSuccessMsg(PairValue ... params) {
+
+        JSONObject jsonObject = new JSONObject()
+                .put("status", "ok");
+
+        for(PairValue p : params)
+            jsonObject.put(p.getKey().toString(), p.getValue());
+
+        return jsonObject.toString();
+    }
+
     public static int getToday() {
         Locale loc = new Locale("en_US");
         SolarCalendar sc = new SolarCalendar();

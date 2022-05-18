@@ -13,6 +13,6 @@ public class WebSocketAuthenticatorService extends Router {
         if (token == null || token.trim().isEmpty())
             throw new AuthenticationCredentialsNotFoundException("Token was null or empty.");
 
-        return getAuthUserWithToken(token);
+        return getSocketUserWithToken(token);
     }
 }

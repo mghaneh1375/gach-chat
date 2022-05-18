@@ -14,6 +14,9 @@ class Utility {
     static void hasAccess(ObjectId userId, String chatId
     ) throws AuthenticationException {
 
+        System.out.println(userId);
+        System.out.println(chatId);
+
         Document chatRoom = chatRoomRepository.findById(new ObjectId(chatId));
 
         if (chatRoom == null)
