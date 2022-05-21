@@ -4,19 +4,40 @@ import org.bson.types.ObjectId;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class Target {
+    public ObjectId getClassId() {
+        return classId;
+    }
 
-    private ChatMode chatMode;
-    private ObjectId targetId;
-    private String targetName;
+    public String getTargetPic() {
+        return targetPic;
+    }
+
+    private final ChatMode chatMode;
+    private final ObjectId targetId;
+    private final String targetName;
+    private final ObjectId classId;
+    private final String targetPic;
 
     public Target(ChatMode chatMode, ObjectId targetId, String targetName) {
         this.chatMode = chatMode;
         this.targetId = targetId;
         this.targetName = targetName;
+        classId = null;
+        targetPic = null;
+    }
+
+    public Target(ObjectId targetId,
+                  String targetName,
+                  String targetPic,
+                  ObjectId classId) {
+        this.chatMode = ChatMode.PEER;
+        this.targetId = targetId;
+        this.targetName = targetName;
+        this.classId = classId;
+        this.targetPic = targetPic;
     }
 
     public static JSONArray toJSONArray(List<Target> targets) {
@@ -29,54 +50,20 @@ public class Target {
         return jsonArray;
     }
 
-    public static List<Target> buildFromJSONArray(JSONArray jsonArray) {
+    public static Target searchInTargets(List<Target> targets, ChatMode chatMode, ObjectId id) {
 
-        List<Target> targets = new ArrayList<>();
-
-        for (int i = 0; i < jsonArray.length(); i++) {
-
-            JSONObject jsonObject = jsonArray.getJSONObject(i);
-
-            targets.add(new Target(
-                    jsonObject.getString("mode").equals(ChatMode.GROUP.name()) ?
-                            ChatMode.GROUP : ChatMode.PEER,
-                    new ObjectId(jsonObject.getString("id")),
-                    jsonObject.getString("name")
-            ));
-        }
-
-        return targets;
-    }
-
-    public static Target buildFromJSONObject(JSONObject jsonObject) {
-        return new Target(
-                jsonObject.getString("mode").equals(ChatMode.GROUP.name()) ?
-                        ChatMode.GROUP : ChatMode.PEER,
-                new ObjectId(jsonObject.getString("id")),
-                jsonObject.getString("name")
-        );
-    }
-
-    public static List<Target> findManyInJSONArray(JSONArray jsonArray,
-                                         String mode, String id) {
-
-        ArrayList<Target> targets = new ArrayList<>();
-
-        for (int i = 0; i < jsonArray.length(); i++) {
-
-            JSONObject jsonObject = jsonArray.getJSONObject(i);
+        for (Target target : targets) {
 
             if (
-                    (mode != null &&
-                            jsonObject.getString("mode").equalsIgnoreCase(mode) &&
-                            jsonObject.getString("id").equals(id)
-                    ) ||
-                            (mode == null && jsonObject.getString("id").equals(id))
+                    ((target.getChatMode().equals(chatMode)) ||
+                            chatMode == null
+                    ) && target.getTargetId().equals(id)
             )
-                targets.add(Target.buildFromJSONObject(jsonObject));
+                return target;
+
         }
 
-        return targets;
+        return null;
     }
 
     public static boolean findInJSONArrayBool(JSONArray jsonArray,
@@ -112,9 +99,18 @@ public class Target {
     }
 
     private JSONObject toJSONObject() {
-        return new JSONObject()
-                .put("mode", chatMode.toString())
+
+        JSONObject jsonObject = new JSONObject()
+//                .put("mode", chatMode.name())
                 .put("name", targetName)
                 .put("id", targetId);
+
+//        if(classId != null)
+//            jsonObject.put("classId", classId);
+
+        if(targetPic != null)
+            jsonObject.put("targetPic", targetPic);
+
+        return jsonObject;
     }
 }

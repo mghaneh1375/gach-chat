@@ -6,8 +6,8 @@ import org.json.JSONObject;
 public class Statics {
 
     //    public final static String STATICS_SERVER = "https://statics.okft.org/";
-//    public final static String STATICS_SERVER = "http://185.239.106.26:8083/";
-    public final static String STATICS_SERVER = "http://192.168.0.106/";
+    public final static String STATICS_SERVER = "http://185.239.106.26:8083/";
+//    public final static String STATICS_SERVER = "http://192.168.0.106/";
 
     public final static boolean DEV_MODE = true;
 
@@ -22,6 +22,8 @@ public class Statics {
     public final static int CLASS_EXPIRATION_SEC = 60 * 60 * 24 * 7;
 
     public final static int TOKEN_REUSABLE = 3;
+    public final static int HEART_BEAT = 20000;
+
 
     public final static int MAX_OBJECT_ID_SIZE = 100;
     public final static int MIN_OBJECT_ID_SIZE = 20;

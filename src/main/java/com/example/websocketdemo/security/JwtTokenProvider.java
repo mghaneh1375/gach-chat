@@ -1,16 +1,13 @@
 package com.example.websocketdemo.security;
 
+import com.example.websocketdemo.db.UserRepository;
 import com.example.websocketdemo.exception.CustomException;
 import com.example.websocketdemo.exception.InvalidFieldsException;
 import com.example.websocketdemo.model.ChatMode;
-import com.example.websocketdemo.model.Role;
 import com.example.websocketdemo.model.Target;
 import com.example.websocketdemo.utility.Authorization;
 import com.example.websocketdemo.utility.PairValue;
 import com.example.websocketdemo.utility.Utility;
-import com.example.websocketdemo.utility.ZipUtils;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 import io.jsonwebtoken.*;
 import org.bson.Document;
@@ -23,13 +20,11 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import javax.servlet.http.HttpServletRequest;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import static com.example.websocketdemo.WebsocketDemoApplication.classRepository;
 import static com.example.websocketdemo.WebsocketDemoApplication.userRepository;
-import static com.example.websocketdemo.utility.Statics.SOCKET_TOKEN_EXPIRATION_MSEC;
-import static com.example.websocketdemo.utility.Statics.TOKEN_REUSABLE;
+import static com.example.websocketdemo.utility.Statics.*;
 import static com.mongodb.client.model.Filters.*;
 
 @Component
@@ -41,11 +36,55 @@ public class JwtTokenProvider {
      */
     final static private String secretKey = "{MIP0kK^PGU;l/{";
     final static private String secretSocketKey = "eFe;ek+;6{B95cU=";
+    final static private String secretServerKey = "zv#x![vph,YLf8/&";
 
     @Value("${security.jwt.token.expire-length:3600000}")
 
     private static MyUserDetails myUserDetails = new MyUserDetails();
-    HashMap<ObjectId, PairValue> cachedTokens = new HashMap<>();
+
+    private class Token {
+
+        long expiredAt;
+        String token;
+        List<Target> targets;
+
+        public Token() {
+        }
+
+        public Token(long expiredAt, String token, List<Target> targets) {
+            this.expiredAt = expiredAt;
+            this.token = token;
+            this.targets = targets;
+        }
+
+        public long getExpiredAt() {
+            return expiredAt;
+        }
+
+        public String getToken() {
+            return token;
+        }
+
+        public List<Target> getTargets() {
+            return targets;
+        }
+
+        public void setExpiredAt(long expiredAt) {
+            this.expiredAt = expiredAt;
+        }
+
+        public void setToken(String token) {
+            this.token = token;
+        }
+
+        public void setTargets(List<Target> targets) {
+            this.targets = targets;
+        }
+    }
+
+
+    HashMap<ObjectId, Token> cachedTokens = new HashMap<>();
+
     //token, expiration_time
     HashMap<String, Long> validatedTokens = new HashMap<>();
 
@@ -57,29 +96,28 @@ public class JwtTokenProvider {
             throws InvalidFieldsException {
 
         ObjectId userId = user.getObjectId("_id");
-        String oldToken = null;
+        Token oldToken = null;
 
         if (cachedTokens.containsKey(userId)) {
 
-            if (System.currentTimeMillis() < (long) cachedTokens.get(userId).getKey())
-                return (String) cachedTokens.get(userId).getValue();
+            if (System.currentTimeMillis() < cachedTokens.get(userId).getExpiredAt())
+                return cachedTokens.get(userId).getToken();
 
-            if (System.currentTimeMillis() - (long) cachedTokens.get(userId).getKey() < 2 * SOCKET_TOKEN_EXPIRATION_MSEC)
-                oldToken = (String) cachedTokens.get(userId).getValue();
+            if (System.currentTimeMillis() - cachedTokens.get(userId).getExpiredAt() < 2 * SOCKET_TOKEN_EXPIRATION_MSEC)
+                oldToken = cachedTokens.get(userId);
         }
 
         Claims claims = Jwts.claims().setSubject(user.getString("username"));
         claims.put("user_id", userId.toString());
         int reuse = 0;
 
-        List<Target> targets;
         boolean reFillTargets = true;
 
         if (oldToken != null) {
 
             try {
-                Jwts.parser().setSigningKey(getSharedKeyBytes(true)).parseClaimsJws(oldToken);
-                return oldToken;
+                Jwts.parser().setSigningKey(getSharedKeyBytes(true)).parseClaimsJws(oldToken.getToken());
+                return oldToken.getToken();
 
             } catch (ExpiredJwtException e) {
 
@@ -97,75 +135,23 @@ public class JwtTokenProvider {
                     reuse = 0;
                 else {
                     reuse++;
-                    claims.put("targets", e.getClaims().get("targets").toString());
                     reFillTargets = false;
                 }
             }
-        }
-
+        } else
+            oldToken = new Token();
 
         if (reFillTargets) {
-
-            targets = new ArrayList<>();
-
-            ArrayList<Object> currentClassAndTeachers = Authorization.isTeacher(user.getString("access")) ?
-                    getCurrentClassIds(userId) :
-                    getCurrentClassAndTeacherIds(user);
-
-            if (Authorization.isTeacher(user.getString("access"))) {
-
-                for (Object o : currentClassAndTeachers) {
-
-                    ObjectId classId = (ObjectId) o;
-                    Document theClass = classRepository.findById(classId);
-
-                    if (theClass == null)
-                        continue;
-
-                    targets.add(new Target(ChatMode.GROUP, classId, theClass.getString("name")));
-
-                    List<Document> students = theClass.getList("students", Document.class);
-                    for (Document student : students) {
-
-                        ObjectId studentId = student.getObjectId("_id");
-                        Document userDoc = userRepository.findById(studentId);
-
-                        if (userDoc == null)
-                            continue;
-
-                        targets.add(new Target(ChatMode.PEER, studentId,
-                                userDoc.getString("name_fa") + " " + userDoc.getString("last_name_fa"))
-                        );
-
-//                        break;
-                    }
-                }
-            } else {
-
-                for (Object o : currentClassAndTeachers) {
-
-                    PairValue p = (PairValue) o;
-                    ObjectId classId = (ObjectId) p.getKey();
-                    Document theClass = classRepository.findById(classId);
-
-                    if (theClass == null)
-                        continue;
-
-                    targets.add(new Target(ChatMode.GROUP, classId, theClass.getString("name")));
-                    targets.add(new Target(ChatMode.PEER, theClass.getObjectId("teacher_id"), (String) p.getValue()));
-                }
-
-            }
-
-            System.out.println(Target.toJSONArray(targets).toString().getBytes().length);
-            String s = ZipUtils.compress(Target.toJSONArray(targets).toString());
-            System.out.println(s.getBytes().length);
-
-            claims.put("targets", s);
+//            String s = ZipUtils.compress(Target.toJSONArray(targets).toString());
+            oldToken.setTargets(fetchTargetsList(userId,
+                    Authorization.isTeacher(user.getString("access")),
+                    user)
+            );
         }
 
         claims.put("reuse", reuse);
         claims.put("name", user.getString("name_fa") + " " + user.getString("last_name_fa"));
+        claims.put("pic", STATICS_SERVER + UserRepository.FOLDER + "/" + user.getString("pic"));
         claims.put("access", user.getString("access"));
         claims.put("digest", user.getObjectId("_id").toString() + "_" +
                 user.getString("username") + "_" + user.getString("access"));
@@ -173,17 +159,93 @@ public class JwtTokenProvider {
         Date now = new Date();
         long expireTime = now.getTime() + SOCKET_TOKEN_EXPIRATION_MSEC;
 
-        String token = Jwts.builder()
+        oldToken.setToken(Jwts.builder()
                 .setClaims(claims)
                 .setIssuedAt(now)
                 .setExpiration(new Date(expireTime))
                 .signWith(SignatureAlgorithm.HS256, getSharedKeyBytes(true))
-                .compact();
+                .compact()
+        );
 
-        cachedTokens.put(user.getObjectId("_id"), new PairValue(expireTime, token));
-        validatedTokens.put(token, expireTime);
+        oldToken.setExpiredAt(expireTime);
 
-        return token;
+
+        if (cachedTokens.containsKey(userId))
+            cachedTokens.put(user.getObjectId("_id"), oldToken);
+
+        validatedTokens.put(oldToken.getToken(), expireTime);
+        return oldToken.getToken();
+    }
+
+    private List<Target> fetchTargetsList(ObjectId userId,
+                                          boolean isTeacher,
+                                          Document user) {
+
+        List<Target> targets = new ArrayList<>();
+        ArrayList<Object> currentClassAndTeachers;
+
+        if (isTeacher)
+            currentClassAndTeachers = getCurrentClassIds(userId);
+        else {
+
+            if (user == null)
+                user = userRepository.findById(userId);
+
+            currentClassAndTeachers = getCurrentClassAndTeacherIds(user);
+        }
+
+        if (isTeacher) {
+
+            for (Object o : currentClassAndTeachers) {
+
+                ObjectId classId = (ObjectId) o;
+                Document theClass = classRepository.findById(classId);
+
+                if (theClass == null)
+                    continue;
+
+                targets.add(new Target(ChatMode.GROUP, classId, theClass.getString("name")));
+
+                List<Document> students = theClass.getList("students", Document.class);
+                for (Document student : students) {
+
+                    ObjectId studentId = student.getObjectId("_id");
+                    Document userDoc = userRepository.findById(studentId);
+
+                    if (userDoc == null)
+                        continue;
+
+                    targets.add(new Target(studentId,
+                            userDoc.getString("name_fa") + " " + userDoc.getString("last_name_fa"),
+                            STATICS_SERVER + UserRepository.FOLDER + "/" + userDoc.getString("pic"),
+                            classId)
+                    );
+                }
+            }
+        } else {
+
+            for (Object o : currentClassAndTeachers) {
+
+                PairValue p = (PairValue) o;
+                ObjectId classId = (ObjectId) p.getKey();
+                Document theClass = classRepository.findById(classId);
+
+                if (theClass == null)
+                    continue;
+
+                targets.add(new Target(ChatMode.GROUP, classId, theClass.getString("name")));
+                String[] splited = ((String) p.getValue()).split("&&&&");
+
+                targets.add(new Target(
+                                theClass.getObjectId("teacher_id"),
+                                splited[0], splited[1], classId
+                        )
+                );
+            }
+
+        }
+
+        return targets;
     }
 
     Authentication getAuthentication(String token, boolean isForSocket) {
@@ -201,11 +263,33 @@ public class JwtTokenProvider {
 
         Claims claims = Jwts.parser().setSigningKey(getSharedKeyBytes(true)).parseClaimsJws(token).getBody();
 
-        output.put("_id", new ObjectId(claims.get("user_id").toString()));
-        output.put("username", claims.getSubject());
-        output.put("targets", ZipUtils.extract(claims.get("targets").toString()));
-        output.put("access", claims.get("access"));
+        ObjectId userId = new ObjectId(claims.get("user_id").toString());
 
+        output.put("_id", userId);
+        output.put("name", claims.get("name"));
+        output.put("pic", claims.get("pic"));
+        output.put("username", claims.getSubject());
+//        output.put("targets", ZipUtils.extract(claims.get("targets").toString()));
+
+        if (cachedTokens.containsKey(userId))
+            output.put("targets", cachedTokens.get(userId).getTargets());
+        else {
+
+            List<Target> targets = fetchTargetsList(userId,
+                    Authorization.isTeacher(claims.get("access").toString()),
+                    null
+            );
+
+            cachedTokens.put(userId, new Token(
+                    claims.getExpiration().getTime(),
+                    token,
+                    targets
+            ));
+
+            output.put("targets", targets);
+        }
+
+        output.put("access", claims.get("access"));
         return output;
     }
 
@@ -248,6 +332,27 @@ public class JwtTokenProvider {
         return validateToken(token, true);
     }
 
+    HashMap<String, String> validateServerToken(String token) {
+
+        try {
+            Jws<Claims> cliams = Jwts.parser().setSigningKey(
+                    Base64.getEncoder().encodeToString(secretServerKey.getBytes())
+            ).parseClaimsJws(token);
+
+            HashMap<String, String> out = new HashMap<>();
+
+            for(String str : cliams.getBody().keySet())
+                out.put(str, cliams.getBody().get(str).toString());
+
+            return out;
+
+        } catch (JwtException | IllegalArgumentException e) {
+            System.out.println("expire " + e.getMessage());
+            throw new CustomException("Expired or invalid JWT token", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+    }
+
     private ArrayList<Object> getCurrentClassAndTeacherIds(Document user) {
 
         List<Document> passed = user.getList("passed", Document.class);
@@ -280,7 +385,8 @@ public class JwtTokenProvider {
 
             PairValue p = new PairValue(
                     theClass.getObjectId("_id"),
-                    teacher.getString("name_fa") + " " + teacher.getString("last_name_fa")
+                    teacher.getString("name_fa") + " " + teacher.getString("last_name_fa") +
+                            "&&&&" + STATICS_SERVER + UserRepository.FOLDER + "/" + teacher.getString("pic")
             );
 
             if (classAndTeacherIds.contains(p))

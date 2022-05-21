@@ -1,5 +1,6 @@
 package com.example.websocketdemo.controller;
 
+import com.example.websocketdemo.exception.NotAccessException;
 import com.example.websocketdemo.exception.NotActivateAccountException;
 import com.example.websocketdemo.exception.UnAuthException;
 import com.example.websocketdemo.model.*;
@@ -28,6 +29,7 @@ import javax.validation.constraints.NotBlank;
 import java.util.*;
 
 import static com.example.websocketdemo.WebsocketDemoApplication.*;
+import static com.example.websocketdemo.model.Target.searchInTargets;
 import static com.example.websocketdemo.utility.Statics.*;
 import static com.mongodb.client.model.Filters.*;
 
@@ -36,7 +38,7 @@ import static com.mongodb.client.model.Filters.*;
 public class ChatController extends Router {
 
     private final static Integer UPDATE_PERIOD_MSEC = 60000;
-    private final static Integer UPDATE_BACK_PERIOD_MSEC = 6000;
+    private final static Integer UPDATE_BACK_PERIOD_MSEC = HEART_BEAT + 1000;
     private final static Integer PER_PAGE = 7;
 
     @Autowired
@@ -58,9 +60,9 @@ public class ChatController extends Router {
         JSONObject jsonObject = new JSONObject(jsonStr);
         String captcha = jsonObject.getString("captcha");
 
-        if(!DEV_MODE) {
+        if (!DEV_MODE) {
 
-            if(captcha.isEmpty())
+            if (captcha.isEmpty())
                 return JSON_NOT_ACCESS;
 
             try {
@@ -71,14 +73,12 @@ public class ChatController extends Router {
 
         }
 
-
-        //todo validate captcha
-
         try {
             String token = jwtTokenProvider.createToken(user);
 
             return Utility.generateSuccessMsg(
                     new PairValue("token", token),
+                    new PairValue("heartBeatInterval", HEART_BEAT),
                     new PairValue("validityDuration", SOCKET_TOKEN_EXPIRATION_MSEC)
             );
         } catch (Exception x) {
@@ -86,27 +86,73 @@ public class ChatController extends Router {
         }
     }
 
-    @PostMapping(value = "/api/sendFile")
+    private class UserChatDocument {
+
+        Document document;
+        String pic;
+        ObjectId id;
+        String name;
+        String filename;
+        String path;
+        long expireAt;
+
+        public UserChatDocument(Document document, String pic,
+                                ObjectId id, String name,
+                                String filename, String path) {
+            this.document = document;
+            this.pic = pic;
+            this.id = id;
+            this.name = name;
+            this.filename = filename;
+            this.path = path;
+            expireAt = System.currentTimeMillis() + 20000;
+        }
+    }
+
+    HashMap<String, UserChatDocument> cachedUserChatDocs = new HashMap<>();
+
+    @PostMapping(value = "/api/hasAccess")
     @ResponseBody
-    public String sendFile(HttpServletRequest request,
-                           @RequestBody @StrongJSONConstraint(
-                                   params = {"msg", "senderId",
-                                           "targetId", "mode", "userName"
-                                   },
-                                   paramsType = {String.class, String.class,
-                                           String.class, String.class, String.class
-                                   }
-                           ) @NotBlank String jsonStr
-    ) throws UnAuthException, NotActivateAccountException {
+    public String hasAccess(HttpServletRequest request,
+                            @RequestBody @StrongJSONConstraint(
+                                    params = {
+                                            "filename",
+                                            "targetId",
+                                            "token"
+                                    },
+                                    paramsType = {
+                                            String.class,
+                                            String.class, String.class
+                                    }
+                            ) @NotBlank String jsonStr
+    ) throws NotAccessException, UnAuthException {
 
         JSONObject jsonObject = new JSONObject(jsonStr);
-        ObjectId senderId = new ObjectId(jsonObject.getString("senderId"));
+
+        isServerValid(request,
+                new PairValue("filename", jsonObject.getString("filename")),
+                new PairValue("targetId", jsonObject.getString("targetId"))
+        );
+
+        String token = jsonObject.getString("token");
+
+        HashMap<String, Object> user = getClaims(token);
         ObjectId targetId = new ObjectId(jsonObject.getString("targetId"));
-        String mode = jsonObject.getString("mode").toLowerCase();
+
+        Target target = searchInTargets(
+                (List<Target>) user.get("targets"),
+                null, targetId
+        );
+
+        if(target == null)
+            throw new NotAccessException("not access");
+
+        ObjectId senderId = (ObjectId) user.get("_id");
+        String mode = target.getChatMode().getName();
         Document chat;
 
-        if(mode.equalsIgnoreCase(ChatMode.PEER.name()))
-             chat = chatRoomRepository.findOne(
+        if (mode.equalsIgnoreCase(ChatMode.PEER.getName()))
+            chat = chatRoomRepository.findOne(
                     or(
                             and(
                                     eq("sender_id", senderId),
@@ -122,22 +168,69 @@ public class ChatController extends Router {
             );
         else
             chat = chatRoomRepository.findOne(
-                and(
-                        eq("mode", mode),
-                        eq("receiver_id", targetId)
-                ), null
+                    and(
+                            eq("mode", mode),
+                            eq("receiver_id", targetId)
+                    ), null
             );
 
-        if(chat == null)
+        if (chat == null)
+            throw new NotAccessException("not access");
+
+        String nonce = senderId.toString() + "_" + System.currentTimeMillis();
+        String filename = jsonObject.getString("filename");
+
+        cachedUserChatDocs.put(nonce, new UserChatDocument(
+                chat,
+                user.get("pic").toString(),
+                senderId,
+                user.get("name").toString(),
+                filename,
+                nonce + "_" + filename
+        ));
+
+        return Utility.generateSuccessMsg(
+                new PairValue("nonce", nonce)
+        );
+
+    }
+
+    @PostMapping(value = "/api/sendFile")
+    @ResponseBody
+    public String sendFile(HttpServletRequest request,
+                           @RequestBody @StrongJSONConstraint(
+                                   params = {"nonce"},
+                                   paramsType = {String.class
+                                   }
+                           ) @NotBlank String jsonStr
+    ) throws NotAccessException {
+
+        JSONObject jsonObject = new JSONObject(jsonStr);
+
+        String nonce = jsonObject.getString("nonce");
+
+        isServerValid(request,
+                new PairValue("nonce", nonce)
+        );
+
+        if(!cachedUserChatDocs.containsKey(nonce))
             return JSON_NOT_VALID_PARAMS;
 
-        chat = chatRoomRepository.findById(chat.getObjectId("_id"));
+        UserChatDocument cached = cachedUserChatDocs.get(nonce);
+        cachedUserChatDocs.remove(nonce);
+
+        long curr = System.currentTimeMillis();
+
+        if(cached.expireAt < curr)
+            return JSON_NOT_ACCESS;
 
         doSendMsg(
-                "file&&&" + jsonObject.getString("msg"), senderId,
-                System.currentTimeMillis(),
-                jsonObject.getString("userName"),
-                chat
+                "file&&&" + cached.filename + "##" + cached.path,
+                cached.id,
+                curr,
+                cached.name,
+                cached.pic,
+                cached.document
         );
 
         return Utility.generateSuccessMsg();
@@ -151,22 +244,24 @@ public class ChatController extends Router {
 
         HashMap<String, Object> user = getClaims(request);
 
-        JSONArray targetsJSON = (JSONArray) user.get("targets");
+        final List<Target> targets = (List<Target>) user.get("targets");
 
-        List<Target> targets = Target.findManyInJSONArray(targetsJSON, ChatMode.GROUP.name(), classId.toString());
-        if(targets.size() == 0)
-            return JSON_NOT_ACCESS;
+        List<Target> wanted = new ArrayList<>();
 
-        JSONArray jsonArray = new JSONArray();
+        for (Target target : targets) {
 
-        for(Target t : targets) {
-            jsonArray.put(new JSONObject()
-                    .put("id", t.getTargetId().toString())
-                    .put("name", t.getTargetName())
-            );
+            if (target.getChatMode().equals(ChatMode.PEER) &&
+                    target.getClassId().equals(classId)
+            )
+                wanted.add(target);
         }
 
-        return Utility.generateSuccessMsg("students", jsonArray);
+        if (wanted.size() == 0)
+            return JSON_NOT_ACCESS;
+
+        return Utility.generateSuccessMsg(
+                "students", Target.toJSONArray(wanted)
+        );
     }
 
     @GetMapping(value = "/api/chats")
@@ -176,8 +271,7 @@ public class ChatController extends Router {
 
         HashMap<String, Object> user = getClaims(request);
 
-        JSONArray targetsJSON = new JSONArray(user.get("targets").toString());
-        List<Target> targets = Target.buildFromJSONArray(targetsJSON);
+        List<Target> targets = (List<Target>) user.get("targets");
 
         ObjectId senderId = (ObjectId) user.get("_id");
         boolean isTeacher = user.get("access").equals(Access.TEACHER.getName());
@@ -285,9 +379,11 @@ public class ChatController extends Router {
         HashMap<String, Object> user = getClaims(request);
         mode = mode.toLowerCase();
 
-        JSONArray targetsJSON = new JSONArray(user.get("targets").toString());
+        List<Target> targets = (List<Target>) user.get("targets");
 
-        if (!Target.findInJSONArrayBool(targetsJSON, mode, receiverId.toString()))
+        if (searchInTargets(targets,
+                mode.equalsIgnoreCase(ChatMode.GROUP.getName()) ? ChatMode.GROUP :
+                        ChatMode.PEER, receiverId) == null)
             return JSON_NOT_ACCESS;
 
         ObjectId senderId = (ObjectId) user.get("_id");
@@ -347,7 +443,7 @@ public class ChatController extends Router {
 
         }
 
-        if (!chatRoom.getString("mode").equals(mode))
+        if (!chatRoom.getString("mode").equalsIgnoreCase(mode))
             return JSON_NOT_VALID_PARAMS;
 
         if (lastCreatedAt == -1) {
@@ -397,19 +493,24 @@ public class ChatController extends Router {
                 continue;
 
             boolean amISender = chat.getObjectId("sender").equals(senderId);
-            Document sender = null;
+            Target sender = null;
 
             if (!amISender)
-                sender = userRepository.findById(chat.getObjectId("sender"));
+                sender = Target.searchInTargets(targets, ChatMode.PEER, chat.getObjectId("sender"));
 
             String content = chat.getString("content");
             boolean isFile = content.startsWith("file&&&");
+            String originalFilename = "";
 
-            if(isFile)
-                content = STATICS_SERVER + "chat/" + content.replace("file&&&", "");
+            if (isFile) {
+                String[] splited = content.replace("file&&&", "").split("##");
+                content = STATICS_SERVER + "chat/" + splited[1];
+                originalFilename = splited[0];
+            }
 
             JSONObject jsonObject = new JSONObject()
                     .put("content", content)
+                    .put("originalFilename", originalFilename)
                     .put("file", isFile)
                     .put("amISender", amISender)
                     .put("id", chat.getObjectId("_id").toString())
@@ -417,10 +518,10 @@ public class ChatController extends Router {
 //                    .put("status", chat.getString("status"))
                     ;
 
-            if (sender != null)
-                jsonObject.put("sender",
-                        sender.getString("name_fa") + " " + sender.getString("last_name_fa")
-                );
+            if (sender != null) {
+                jsonObject.put("sender", sender.getTargetName());
+                jsonObject.put("pic", sender.getTargetPic());
+            }
 
             stack.push(jsonObject);
 
@@ -464,7 +565,6 @@ public class ChatController extends Router {
             switch (jsonObject.getString("type").toLowerCase()) {
 
                 case "heart":
-
                     Document chatPresence = chatPresenceRepository.findBySecKey(senderId);
                     if (chatPresence == null) {
                         chatPresenceRepository.insertOne(
@@ -551,7 +651,8 @@ public class ChatController extends Router {
 
                 case "send":
                     sendMsg(jsonObject, senderId,
-                            curr, (String) user.get("name")
+                            curr, (String) user.get("name"),
+                            (String) user.get("pic")
                     );
                     return;
 
@@ -566,7 +667,7 @@ public class ChatController extends Router {
 
 
     private void sendMsg(JSONObject jsonObject, ObjectId senderId,
-                         long curr, String user_name) {
+                         long curr, String user_name, String pic) {
 
         if (!jsonObject.has("chatId") ||
                 !jsonObject.has("content")
@@ -578,11 +679,14 @@ public class ChatController extends Router {
         if (chatRoom == null)
             return;
 
-        doSendMsg(jsonObject.getString("content"), senderId, curr, user_name, chatRoom);
+        doSendMsg(jsonObject.getString("content"),
+                senderId, curr, user_name, pic, chatRoom
+        );
     }
 
     private void doSendMsg(String content, ObjectId senderId,
-                         long curr, String user_name, Document chatRoom) {
+                           long curr, String user_name, String pic,
+                           Document chatRoom) {
 
         boolean amIStarter = false;
         long lastSeenTarget = -1;
@@ -634,7 +738,7 @@ public class ChatController extends Router {
                 curr,
                 chatRoom.getObjectId("_id").toString(),
                 senderId.toString(),
-                user_name
+                user_name, pic
         );
 
         if (curr - lastSeenTarget > UPDATE_BACK_PERIOD_MSEC) {
@@ -652,7 +756,7 @@ public class ChatController extends Router {
                 );
 
                 if (chatPresenceTmp != null &&
-                        curr - chatPresenceTmp.getLong("last_seen") < 8000) {
+                        curr - chatPresenceTmp.getLong("last_seen") < HEART_BEAT + 3000) {
 
                     String postfix = amIStarter ? chatRoom.getObjectId("receiver_id").toString() :
                             chatRoom.getObjectId("sender_id").toString();
@@ -683,7 +787,7 @@ public class ChatController extends Router {
                     );
 
                     if (chatPresenceTmp != null &&
-                            curr - chatPresenceTmp.getLong("last_seen") < 8000) {
+                            curr - chatPresenceTmp.getLong("last_seen") < HEART_BEAT + 3000) {
 
                         String postfix = doc.getObjectId("user_id").toString();
 
@@ -747,17 +851,4 @@ public class ChatController extends Router {
         }
     }
 
-    private Target searchInTargets(List<Target> targets, ChatMode chatMode, ObjectId id) {
-
-        for (Target target : targets) {
-
-            if (target.getChatMode().equals(chatMode) &&
-                    target.getTargetId().equals(id)
-            )
-                return target;
-
-        }
-
-        return null;
-    }
 }

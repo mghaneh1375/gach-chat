@@ -7,6 +7,7 @@ import com.example.websocketdemo.model.Target;
 import com.example.websocketdemo.security.JwtTokenFilter;
 import com.example.websocketdemo.service.UserService;
 import com.example.websocketdemo.utility.Authorization;
+import com.example.websocketdemo.utility.PairValue;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.json.JSONArray;
@@ -16,11 +17,14 @@ import org.springframework.security.core.Authentication;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
+import java.util.List;
 
 public class Router {
 
     @Autowired
     private UserService userService;
+
+    private static JwtTokenFilter jwtTokenFilter = new JwtTokenFilter();
 
     private boolean isAdmin(HttpServletRequest request, Document u) throws NotActivateAccountException, NotAccessException {
 
@@ -42,17 +46,16 @@ public class Router {
     protected HashMap<String, Object> getClaims(HttpServletRequest request)
             throws UnAuthException {
 
-        boolean auth = new JwtTokenFilter().isAuth(request, true);
+        boolean auth = jwtTokenFilter.isAuth(request, true);
         if (auth)
             return userService.getClaims(request);
 
         throw new UnAuthException("Token is not valid");
     }
 
-    HashMap<String, Object> getClaims(String token)
-            throws UnAuthException {
+    HashMap<String, Object> getClaims(String token) throws UnAuthException {
 
-        boolean isAuth = new JwtTokenFilter().isAuth(token, true);
+        boolean isAuth = jwtTokenFilter.isAuth(token, true);
 
         if (isAuth)
             return userService.getClaims(token);
@@ -60,10 +63,27 @@ public class Router {
         throw new UnAuthException("Token is not valid");
     }
 
+    void isServerValid(
+            HttpServletRequest request,
+            PairValue ... pairs
+    ) throws NotAccessException {
+
+        HashMap<String, String> out = jwtTokenFilter.isAuthServer(request);
+
+        if(out == null)
+            throw new NotAccessException("not access");
+
+        for(PairValue p : pairs) {
+            if(!out.get(p.getKey().toString()).equals(p.getValue()))
+                throw new NotAccessException("not access");
+        }
+
+    }
+
     protected Document getUserWithOutCheckCompleteness(HttpServletRequest request)
             throws NotActivateAccountException, UnAuthException {
 
-        boolean auth = new JwtTokenFilter().isAuth(request, false);
+        boolean auth = jwtTokenFilter.isAuth(request, false);
 
         Document u;
         if (auth) {
@@ -83,7 +103,7 @@ public class Router {
 
     void getUserWithToken(String token, String claimId, String targetId) {
 
-        boolean isAuth = new JwtTokenFilter().isAuth(token, true);
+        boolean isAuth = jwtTokenFilter.isAuth(token, true);
 
         if (isAuth) {
 
@@ -94,11 +114,9 @@ public class Router {
                 throw new AuthenticationCredentialsNotFoundException("Has no access");
             }
 
-            if (targetId != null && Target.findInJSONArrayBool(
-                    new JSONArray(user.get("targets").toString()),
-                    null, targetId
-                    )
-            )
+            if (targetId != null && Target.searchInTargets(
+                    (List<Target>) user.get("targets"), null, new ObjectId(targetId)
+            ) != null)
                 throw new AuthenticationCredentialsNotFoundException("Has no access");
 
             return;
@@ -109,7 +127,7 @@ public class Router {
 
     Authentication getSocketUserWithToken(String token) {
 
-        Authentication auth = new JwtTokenFilter().isAuth(token);
+        Authentication auth = jwtTokenFilter.isAuth(token);
 
         if (auth != null)
             return auth;

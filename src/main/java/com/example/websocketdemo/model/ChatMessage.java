@@ -8,6 +8,16 @@ public class ChatMessage {
     private String id;
     private long timestamp;
     private boolean isFile;
+    private String pic;
+    private String originalFilename;
+
+    public String getOriginalFilename() {
+        return originalFilename;
+    }
+
+    public String getPic() {
+        return pic;
+    }
 
     public String getChatId() {
         return chatId;
@@ -67,19 +77,26 @@ public class ChatMessage {
 
     public ChatMessage(String content, String id,
                        long timestamp, String chatId,
-                       String senderId, String sender) {
+                       String senderId, String sender,
+                       String pic) {
 
         isFile = content.startsWith("file&&&");
 
-        if(isFile)
-            this.content = STATICS_SERVER + "chat/" + content.replace("file&&&", "");
-        else
+        if(isFile) {
+            String[] splited = content.replace("file&&&", "").split("##");
+            this.content = STATICS_SERVER + "chat/" + splited[1];
+            originalFilename = splited[0];
+        }
+        else {
             this.content = content;
+            originalFilename = "";
+        }
 
         this.id = id;
         this.timestamp = timestamp;
         this.chatId = chatId;
         this.senderId = senderId;
         this.sender = sender;
+        this.pic = pic;
     }
 }

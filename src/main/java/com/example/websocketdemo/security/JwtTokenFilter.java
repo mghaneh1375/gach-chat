@@ -10,6 +10,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.HashMap;
 
 
 // We should use OncePerRequestFilter since we are doing a database call, there is no point in doing this more than once
@@ -28,6 +29,25 @@ public class JwtTokenFilter extends OncePerRequestFilter {
 
     public boolean isAuth(HttpServletRequest request, boolean isForSocket) {
         return isAuth(jwtTokenProvider.resolveToken(request), isForSocket);
+    }
+
+    public HashMap<String, String> isAuthServer(HttpServletRequest request) {
+
+        String token = jwtTokenProvider.resolveToken(request);
+
+        if(token != null) {
+            try {
+
+                HashMap<String, String> out = jwtTokenProvider.validateServerToken(token);
+                if(out == null)
+                    return null;
+
+                return out;
+
+            } catch (CustomException ignore) {}
+        }
+
+        return null;
     }
 
     public boolean isAuth(String token, boolean isForSocket) {
