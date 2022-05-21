@@ -8,6 +8,7 @@ import com.example.websocketdemo.model.Target;
 import com.example.websocketdemo.utility.Authorization;
 import com.example.websocketdemo.utility.PairValue;
 import com.example.websocketdemo.utility.Utility;
+import com.example.websocketdemo.utility.ZipUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
@@ -39,6 +40,7 @@ public class JwtTokenProvider {
      * microservices environment, this key would be kept on a config-server.
      */
     final static private String secretKey = "{MIP0kK^PGU;l/{";
+    final static private String secretSocketKey = "eFe;ek+;6{B95cU=";
 
     @Value("${security.jwt.token.expire-length:3600000}")
 
@@ -47,63 +49,62 @@ public class JwtTokenProvider {
     //token, expiration_time
     HashMap<String, Long> validatedTokens = new HashMap<>();
 
-    private String getSharedKeyBytes() {
-        return Base64.getEncoder().encodeToString(secretKey.getBytes());
+    private String getSharedKeyBytes(boolean isForSocket) {
+        return Base64.getEncoder().encodeToString(isForSocket ? secretSocketKey.getBytes() : secretKey.getBytes());
     }
 
-    public String createToken(Document user, Role role,
-                              String oldToken) throws InvalidFieldsException, JsonProcessingException {
+    public String createToken(Document user)
+            throws InvalidFieldsException {
 
         ObjectId userId = user.getObjectId("_id");
+        String oldToken = null;
 
         if (cachedTokens.containsKey(userId)) {
 
             if (System.currentTimeMillis() < (long) cachedTokens.get(userId).getKey())
                 return (String) cachedTokens.get(userId).getValue();
 
-            if (oldToken == null)
-                throw new InvalidFieldsException("give me your old token");
+            if (System.currentTimeMillis() - (long) cachedTokens.get(userId).getKey() < 2 * SOCKET_TOKEN_EXPIRATION_MSEC)
+                oldToken = (String) cachedTokens.get(userId).getValue();
         }
 
         Claims claims = Jwts.claims().setSubject(user.getString("username"));
-//        claims.put("auth", new SimpleGrantedAuthority(role.getAuthority()));
         claims.put("user_id", userId.toString());
         int reuse = 0;
 
-        List<Target> targets = null;
+        List<Target> targets;
+        boolean reFillTargets = true;
 
         if (oldToken != null) {
 
             try {
-                Jwts.parser().setSigningKey(getSharedKeyBytes()).parseClaimsJws(oldToken);
+                Jwts.parser().setSigningKey(getSharedKeyBytes(true)).parseClaimsJws(oldToken);
                 return oldToken;
 
             } catch (ExpiredJwtException e) {
 
                 if (!e.getClaims().get("user_id").equals(userId.toString()))
-                    throw new InvalidFieldsException("invalid old token");
+                    throw new InvalidFieldsException("invalid old token 1");
 
-                if (System.currentTimeMillis() - e.getClaims().getExpiration().getTime() > SOCKET_TOKEN_EXPIRATION_MSEC)
-                    throw new InvalidFieldsException("invalid old token");
-
-                if (e.getClaims().get("digest").equals(
+                if (!e.getClaims().get("digest").equals(
                         e.getClaims().get("user_id") + "_" + e.getClaims().getSubject() + "_" +
                                 e.getClaims().get("access")
                 ))
-                    throw new InvalidFieldsException("invalid old token");
+                    throw new InvalidFieldsException("invalid old token 2");
 
                 reuse = (int) e.getClaims().get("reuse");
                 if (reuse >= TOKEN_REUSABLE)
                     reuse = 0;
                 else {
                     reuse++;
-                    targets = (List<Target>) e.getClaims().get("targets");
+                    claims.put("targets", e.getClaims().get("targets").toString());
+                    reFillTargets = false;
                 }
             }
         }
 
 
-        if (targets == null) {
+        if (reFillTargets) {
 
             targets = new ArrayList<>();
 
@@ -136,7 +137,7 @@ public class JwtTokenProvider {
                                 userDoc.getString("name_fa") + " " + userDoc.getString("last_name_fa"))
                         );
 
-                        break;
+//                        break;
                     }
                 }
             } else {
@@ -152,21 +153,22 @@ public class JwtTokenProvider {
 
                     targets.add(new Target(ChatMode.GROUP, classId, theClass.getString("name")));
                     targets.add(new Target(ChatMode.PEER, theClass.getObjectId("teacher_id"), (String) p.getValue()));
-
                 }
 
             }
 
-        }
+            System.out.println(Target.toJSONArray(targets).toString().getBytes().length);
+            String s = ZipUtils.compress(Target.toJSONArray(targets).toString());
+            System.out.println(s.getBytes().length);
 
+            claims.put("targets", s);
+        }
 
         claims.put("reuse", reuse);
         claims.put("name", user.getString("name_fa") + " " + user.getString("last_name_fa"));
         claims.put("access", user.getString("access"));
         claims.put("digest", user.getObjectId("_id").toString() + "_" +
                 user.getString("username") + "_" + user.getString("access"));
-
-        claims.put("targets", Target.toJSONArray(targets).toString());
 
         Date now = new Date();
         long expireTime = now.getTime() + SOCKET_TOKEN_EXPIRATION_MSEC;
@@ -175,7 +177,7 @@ public class JwtTokenProvider {
                 .setClaims(claims)
                 .setIssuedAt(now)
                 .setExpiration(new Date(expireTime))
-                .signWith(SignatureAlgorithm.HS256, getSharedKeyBytes())
+                .signWith(SignatureAlgorithm.HS256, getSharedKeyBytes(true))
                 .compact();
 
         cachedTokens.put(user.getObjectId("_id"), new PairValue(expireTime, token));
@@ -184,24 +186,24 @@ public class JwtTokenProvider {
         return token;
     }
 
-    Authentication getAuthentication(String token) {
-        UserDetails userDetails = myUserDetails.loadUserByUsername(getUsername(token));
+    Authentication getAuthentication(String token, boolean isForSocket) {
+        UserDetails userDetails = myUserDetails.loadUserByUsername(getUsername(token, isForSocket));
         return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
     }
 
-    public String getUsername(String token) {
-        return Jwts.parser().setSigningKey(getSharedKeyBytes()).parseClaimsJws(token).getBody().getSubject();
+    public String getUsername(String token, boolean isForSocket) {
+        return Jwts.parser().setSigningKey(getSharedKeyBytes(isForSocket)).parseClaimsJws(token).getBody().getSubject();
     }
 
     public HashMap<String, Object> getClaims(String token) {
 
         HashMap<String, Object> output = new HashMap<>();
 
-        Claims claims = Jwts.parser().setSigningKey(getSharedKeyBytes()).parseClaimsJws(token).getBody();
+        Claims claims = Jwts.parser().setSigningKey(getSharedKeyBytes(true)).parseClaimsJws(token).getBody();
 
         output.put("_id", new ObjectId(claims.get("user_id").toString()));
         output.put("username", claims.getSubject());
-        output.put("targets", claims.get("targets"));
+        output.put("targets", ZipUtils.extract(claims.get("targets").toString()));
         output.put("access", claims.get("access"));
 
         return output;
@@ -221,7 +223,7 @@ public class JwtTokenProvider {
             return validatedTokens.get(token) >= System.currentTimeMillis();
 
         try {
-            Jws<Claims> cliams = Jwts.parser().setSigningKey(getSharedKeyBytes()).parseClaimsJws(token);
+            Jws<Claims> cliams = Jwts.parser().setSigningKey(getSharedKeyBytes(isForSocket)).parseClaimsJws(token);
 
             if (isForSocket && !cliams.getBody().get("digest").equals(
                     cliams.getBody().get("user_id") + "_" + cliams.getBody().getSubject() + "_" +
@@ -245,7 +247,6 @@ public class JwtTokenProvider {
     boolean validateSocketToken(String token) {
         return validateToken(token, true);
     }
-
 
     private ArrayList<Object> getCurrentClassAndTeacherIds(Document user) {
 

@@ -4,6 +4,9 @@ import com.example.websocketdemo.db.ChatPresenceRepository;
 import com.example.websocketdemo.db.ChatRoomRepository;
 import com.example.websocketdemo.db.ClassRepository;
 import com.example.websocketdemo.db.UserRepository;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClient;
@@ -16,6 +19,8 @@ import org.springframework.context.annotation.FilterType;
 import org.springframework.web.socket.config.annotation.DelegatingWebSocketMessageBrokerConfiguration;
 import org.springframework.web.socket.messaging.SubProtocolWebSocketHandler;
 
+import java.util.concurrent.TimeUnit;
+
 @SpringBootApplication
 public class WebsocketDemoApplication {
 
@@ -27,6 +32,9 @@ public class WebsocketDemoApplication {
 	public static ClassRepository classRepository;
 	public static ChatRoomRepository chatRoomRepository;
 	public static ChatPresenceRepository chatPresenceRepository;
+
+	public static final int SOCKET_MAX_REQUESTS_PER_MIN = 50; //or whatever you want it to be
+	public static LoadingCache<String, Integer> socketRequestCountsPerIpAddress;
 
 	private static void setupDB() {
 
@@ -43,6 +51,14 @@ public class WebsocketDemoApplication {
 			classRepository = new ClassRepository();
 			chatRoomRepository = new ChatRoomRepository();
 			chatPresenceRepository = new ChatPresenceRepository();
+
+			socketRequestCountsPerIpAddress = CacheBuilder.newBuilder().
+					expireAfterWrite(1, TimeUnit.MINUTES).build(new CacheLoader<>() {
+						public Integer load(String key) {
+							return 0;
+						}
+					});
+
 
 		} catch (Exception x) {
 			x.printStackTrace();

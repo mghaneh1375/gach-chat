@@ -1,4 +1,4 @@
-package bogen.austria.Utility;
+package com.example.websocketdemo.utility;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 

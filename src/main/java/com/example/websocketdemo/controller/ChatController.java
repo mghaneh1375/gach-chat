@@ -5,14 +5,12 @@ import com.example.websocketdemo.exception.UnAuthException;
 import com.example.websocketdemo.model.*;
 import com.example.websocketdemo.security.JwtTokenProvider;
 import com.example.websocketdemo.utility.PairValue;
+import com.example.websocketdemo.utility.ReCaptcharV3Handler;
 import com.example.websocketdemo.utility.Utility;
 import com.example.websocketdemo.validator.EnumValidator;
 import com.example.websocketdemo.validator.EnumValidatorImp;
 import com.example.websocketdemo.validator.ObjectIdConstraint;
 import com.example.websocketdemo.validator.StrongJSONConstraint;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.commons.codec.binary.Base64;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.json.JSONArray;
@@ -27,11 +25,11 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.constraints.NotBlank;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import static com.example.websocketdemo.WebsocketDemoApplication.*;
 import static com.example.websocketdemo.utility.Statics.*;
+import static com.mongodb.client.model.Filters.*;
 
 @Controller
 @Validated
@@ -52,9 +50,7 @@ public class ChatController extends Router {
     public String getToken(HttpServletRequest request,
                            @RequestBody @StrongJSONConstraint(
                                    params = {"captcha"},
-                                   paramsType = {String.class},
-                                   optionals = {"oldToken"},
-                                   optionalsType = {String.class}
+                                   paramsType = {String.class}
                            ) @NotBlank String jsonStr
     ) throws UnAuthException, NotActivateAccountException {
 
@@ -62,11 +58,24 @@ public class ChatController extends Router {
         JSONObject jsonObject = new JSONObject(jsonStr);
         String captcha = jsonObject.getString("captcha");
 
+        if(!DEV_MODE) {
+
+            if(captcha.isEmpty())
+                return JSON_NOT_ACCESS;
+
+            try {
+                new ReCaptcharV3Handler().verify(captcha);
+            } catch (Exception x) {
+                return JSON_NOT_ACCESS;
+            }
+
+        }
+
+
         //todo validate captcha
 
         try {
-            String token = jwtTokenProvider.createToken(user, Role.ROLE_CLIENT,
-                    jsonObject.has("oldToken") ? jsonObject.getString("oldToken") : null);
+            String token = jwtTokenProvider.createToken(user);
 
             return Utility.generateSuccessMsg(
                     new PairValue("token", token),
@@ -75,6 +84,89 @@ public class ChatController extends Router {
         } catch (Exception x) {
             return Utility.generateErr(x.getMessage());
         }
+    }
+
+    @PostMapping(value = "/api/sendFile")
+    @ResponseBody
+    public String sendFile(HttpServletRequest request,
+                           @RequestBody @StrongJSONConstraint(
+                                   params = {"msg", "senderId",
+                                           "targetId", "mode", "userName"
+                                   },
+                                   paramsType = {String.class, String.class,
+                                           String.class, String.class, String.class
+                                   }
+                           ) @NotBlank String jsonStr
+    ) throws UnAuthException, NotActivateAccountException {
+
+        JSONObject jsonObject = new JSONObject(jsonStr);
+        ObjectId senderId = new ObjectId(jsonObject.getString("senderId"));
+        ObjectId targetId = new ObjectId(jsonObject.getString("targetId"));
+        String mode = jsonObject.getString("mode").toLowerCase();
+        Document chat;
+
+        if(mode.equalsIgnoreCase(ChatMode.PEER.name()))
+             chat = chatRoomRepository.findOne(
+                    or(
+                            and(
+                                    eq("sender_id", senderId),
+                                    eq("mode", mode),
+                                    eq("receiver_id", targetId)
+                            ),
+                            and(
+                                    eq("receiver_id", senderId),
+                                    eq("mode", mode),
+                                    eq("sender_id", targetId)
+                            )
+                    ), null
+            );
+        else
+            chat = chatRoomRepository.findOne(
+                and(
+                        eq("mode", mode),
+                        eq("receiver_id", targetId)
+                ), null
+            );
+
+        if(chat == null)
+            return JSON_NOT_VALID_PARAMS;
+
+        chat = chatRoomRepository.findById(chat.getObjectId("_id"));
+
+        doSendMsg(
+                "file&&&" + jsonObject.getString("msg"), senderId,
+                System.currentTimeMillis(),
+                jsonObject.getString("userName"),
+                chat
+        );
+
+        return Utility.generateSuccessMsg();
+    }
+
+    @GetMapping(value = "/api/getStudents/{classId}")
+    @ResponseBody
+    public String getStudents(HttpServletRequest request,
+                              @PathVariable @ObjectIdConstraint ObjectId classId)
+            throws UnAuthException {
+
+        HashMap<String, Object> user = getClaims(request);
+
+        JSONArray targetsJSON = (JSONArray) user.get("targets");
+
+        List<Target> targets = Target.findManyInJSONArray(targetsJSON, ChatMode.GROUP.name(), classId.toString());
+        if(targets.size() == 0)
+            return JSON_NOT_ACCESS;
+
+        JSONArray jsonArray = new JSONArray();
+
+        for(Target t : targets) {
+            jsonArray.put(new JSONObject()
+                    .put("id", t.getTargetId().toString())
+                    .put("name", t.getTargetName())
+            );
+        }
+
+        return Utility.generateSuccessMsg("students", jsonArray);
     }
 
     @GetMapping(value = "/api/chats")
@@ -195,7 +287,7 @@ public class ChatController extends Router {
 
         JSONArray targetsJSON = new JSONArray(user.get("targets").toString());
 
-        if (!Target.findInJSONArray(targetsJSON, mode, receiverId.toString()))
+        if (!Target.findInJSONArrayBool(targetsJSON, mode, receiverId.toString()))
             return JSON_NOT_ACCESS;
 
         ObjectId senderId = (ObjectId) user.get("_id");
@@ -310,8 +402,15 @@ public class ChatController extends Router {
             if (!amISender)
                 sender = userRepository.findById(chat.getObjectId("sender"));
 
+            String content = chat.getString("content");
+            boolean isFile = content.startsWith("file&&&");
+
+            if(isFile)
+                content = STATICS_SERVER + "chat/" + content.replace("file&&&", "");
+
             JSONObject jsonObject = new JSONObject()
-                    .put("content", chat.getString("content"))
+                    .put("content", content)
+                    .put("file", isFile)
                     .put("amISender", amISender)
                     .put("id", chat.getObjectId("_id").toString())
                     .put("createdAt", chat.getLong("created_at"))
@@ -451,143 +550,9 @@ public class ChatController extends Router {
                     return;
 
                 case "send":
-
-                    if (!jsonObject.has("chatId") ||
-                            !jsonObject.has("content")
-                    )
-                        return;
-
-                    chatRoom = chatRoomRepository.findById(new ObjectId(jsonObject.getString("chatId")));
-
-                    if (chatRoom == null)
-                        return;
-
-//                    System.out.println(chatRoom);
-
-                    boolean amIStarter = false;
-                    long lastSeenTarget = -1;
-                    List<Document> persons = null;
-
-                    if (chatRoom.getString("mode").equals("peer")) {
-
-                        if (!chatRoom.getObjectId("sender_id").equals(senderId) &&
-                                !chatRoom.getObjectId("receiver_id").equals(senderId)
-                        )
-                            return;
-
-                        amIStarter = senderId.equals(
-                                chatRoom.getObjectId("sender_id")
-                        );
-
-                        lastSeenTarget = amIStarter ?
-                                chatRoom.getLong("last_seen_rev") :
-                                chatRoom.getLong("last_seen");
-
-//                        System.out.println(amIStarter + " " + lastSeenTarget);
-
-                    } else {
-
-                        persons = chatRoom.getList("persons", Document.class);
-                        Document doc = Utility.searchInDocumentsKeyVal(persons, "user_id", senderId);
-
-                        if (doc == null)
-                            return;
-
-                        doc.put("seen", doc.getInteger("seen") + 1);
-                    }
-
-                    ObjectId newChatId = new ObjectId();
-
-                    List<Document> chats = chatRoom.getList("chats", Document.class);
-                    Document chat = new Document("content", jsonObject.getString("content"))
-                            .append("created_at", curr)
-                            .append("sender", senderId)
-                            .append("_id", newChatId)
-//                            .append("status", ChatMessage.MessageStatus.RECEIVED.toString())
-                            ;
-
-                    chats.add(chat);
-
-                    ChatMessage chatMessage = new ChatMessage(
-                            jsonObject.getString("content"),
-                            newChatId.toString(),
-                            curr,
-                            jsonObject.getString("chatId"),
-                            senderId.toString(),
-                            (String) user.get("name")
+                    sendMsg(jsonObject, senderId,
+                            curr, (String) user.get("name")
                     );
-
-                    if (curr - lastSeenTarget > UPDATE_BACK_PERIOD_MSEC) {
-
-                        if (amIStarter)
-                            chatRoom.put("new_msgs_rev", chatRoom.getInteger("new_msgs_rev") + 1);
-                        else
-                            chatRoom.put("new_msgs", chatRoom.getInteger("new_msgs") + 1);
-
-                        if (chatRoom.getString("mode").equals("peer")) {
-
-                            Document chatPresenceTmp = chatPresenceRepository.findBySecKey(
-                                    amIStarter ? chatRoom.getObjectId("receiver_id") :
-                                            chatRoom.getObjectId("sender_id")
-                            );
-
-                            if (chatPresenceTmp != null &&
-                                    curr - chatPresenceTmp.getLong("last_seen") < 8000) {
-
-                                String postfix = amIStarter ? chatRoom.getObjectId("receiver_id").toString() :
-                                        chatRoom.getObjectId("sender_id").toString();
-
-                                sendChatPresenceMsg(postfix,
-                                        (String) user.get("name"),
-                                        senderId.toString(),
-                                        amIStarter ? chatRoom.getInteger("new_msgs_rev") :
-                                                chatRoom.getInteger("new_msgs"),
-                                        "peer",
-                                        chatMessage
-                                );
-                            }
-                        } else if (persons != null) {
-
-                            for (Document doc : persons) {
-
-                                if (doc.getObjectId("user_id").equals(senderId))
-                                    continue;
-
-                                if (curr - doc.getLong("last_seen") <= UPDATE_BACK_PERIOD_MSEC) {
-                                    doc.put("seen", chatRoom.getInteger("new_msgs"));
-                                    continue;
-                                }
-
-                                Document chatPresenceTmp = chatPresenceRepository.findBySecKey(
-                                        doc.getObjectId("user_id")
-                                );
-
-                                if (chatPresenceTmp != null &&
-                                        curr - chatPresenceTmp.getLong("last_seen") < 8000) {
-
-                                    String postfix = doc.getObjectId("user_id").toString();
-
-                                    sendChatPresenceMsg(postfix,
-                                            "",
-                                            chatRoom.getObjectId("receiver_id").toString(),
-                                            chatRoom.getInteger("new_msgs") - doc.getInteger("seen"),
-                                            "group",
-                                            chatMessage
-                                    );
-                                }
-
-                            }
-
-                        }
-
-                    }
-
-                    messagingTemplate.convertAndSend(
-                            "/chat/" + chatRoom.getObjectId("_id"),
-                            chatMessage
-                    );
-
-                    update(curr, chatRoom);
                     return;
 
                 default:
@@ -599,6 +564,151 @@ public class ChatController extends Router {
         }
     }
 
+
+    private void sendMsg(JSONObject jsonObject, ObjectId senderId,
+                         long curr, String user_name) {
+
+        if (!jsonObject.has("chatId") ||
+                !jsonObject.has("content")
+        )
+            return;
+
+        Document chatRoom = chatRoomRepository.findById(new ObjectId(jsonObject.getString("chatId")));
+
+        if (chatRoom == null)
+            return;
+
+        doSendMsg(jsonObject.getString("content"), senderId, curr, user_name, chatRoom);
+    }
+
+    private void doSendMsg(String content, ObjectId senderId,
+                         long curr, String user_name, Document chatRoom) {
+
+        boolean amIStarter = false;
+        long lastSeenTarget = -1;
+        List<Document> persons = null;
+
+        if (chatRoom.getString("mode").equals("peer")) {
+
+            if (!chatRoom.getObjectId("sender_id").equals(senderId) &&
+                    !chatRoom.getObjectId("receiver_id").equals(senderId)
+            )
+                return;
+
+            amIStarter = senderId.equals(
+                    chatRoom.getObjectId("sender_id")
+            );
+
+            lastSeenTarget = amIStarter ?
+                    chatRoom.getLong("last_seen_rev") :
+                    chatRoom.getLong("last_seen");
+
+//                        System.out.println(amIStarter + " " + lastSeenTarget);
+
+        } else {
+
+            persons = chatRoom.getList("persons", Document.class);
+            Document doc = Utility.searchInDocumentsKeyVal(persons, "user_id", senderId);
+
+            if (doc == null)
+                return;
+
+            doc.put("seen", doc.getInteger("seen") + 1);
+        }
+
+        ObjectId newChatId = new ObjectId();
+
+        List<Document> chats = chatRoom.getList("chats", Document.class);
+        Document chat = new Document("content", content)
+                .append("created_at", curr)
+                .append("sender", senderId)
+                .append("_id", newChatId)
+//                            .append("status", ChatMessage.MessageStatus.RECEIVED.toString())
+                ;
+
+        chats.add(chat);
+
+        ChatMessage chatMessage = new ChatMessage(
+                content,
+                newChatId.toString(),
+                curr,
+                chatRoom.getObjectId("_id").toString(),
+                senderId.toString(),
+                user_name
+        );
+
+        if (curr - lastSeenTarget > UPDATE_BACK_PERIOD_MSEC) {
+
+            if (amIStarter)
+                chatRoom.put("new_msgs_rev", chatRoom.getInteger("new_msgs_rev") + 1);
+            else
+                chatRoom.put("new_msgs", chatRoom.getInteger("new_msgs") + 1);
+
+            if (chatRoom.getString("mode").equals("peer")) {
+
+                Document chatPresenceTmp = chatPresenceRepository.findBySecKey(
+                        amIStarter ? chatRoom.getObjectId("receiver_id") :
+                                chatRoom.getObjectId("sender_id")
+                );
+
+                if (chatPresenceTmp != null &&
+                        curr - chatPresenceTmp.getLong("last_seen") < 8000) {
+
+                    String postfix = amIStarter ? chatRoom.getObjectId("receiver_id").toString() :
+                            chatRoom.getObjectId("sender_id").toString();
+
+                    sendChatPresenceMsg(postfix,
+                            user_name,
+                            senderId.toString(),
+                            amIStarter ? chatRoom.getInteger("new_msgs_rev") :
+                                    chatRoom.getInteger("new_msgs"),
+                            "peer",
+                            chatMessage
+                    );
+                }
+            } else if (persons != null) {
+
+                for (Document doc : persons) {
+
+                    if (doc.getObjectId("user_id").equals(senderId))
+                        continue;
+
+                    if (curr - doc.getLong("last_seen") <= UPDATE_BACK_PERIOD_MSEC) {
+                        doc.put("seen", chatRoom.getInteger("new_msgs"));
+                        continue;
+                    }
+
+                    Document chatPresenceTmp = chatPresenceRepository.findBySecKey(
+                            doc.getObjectId("user_id")
+                    );
+
+                    if (chatPresenceTmp != null &&
+                            curr - chatPresenceTmp.getLong("last_seen") < 8000) {
+
+                        String postfix = doc.getObjectId("user_id").toString();
+
+                        sendChatPresenceMsg(postfix,
+                                "",
+                                chatRoom.getObjectId("receiver_id").toString(),
+                                chatRoom.getInteger("new_msgs") - doc.getInteger("seen"),
+                                "group",
+                                chatMessage
+                        );
+                    }
+
+                }
+
+            }
+
+        }
+
+        messagingTemplate.convertAndSend(
+                "/chat/" + chatRoom.getObjectId("_id"),
+                chatMessage
+        );
+
+        update(curr, chatRoom);
+    }
 
     // send notif if user in online but not in wanted chat
     private void sendChatPresenceMsg(String postfix,
@@ -622,10 +732,12 @@ public class ChatController extends Router {
     }
 
     private void update(long curr, Document chatRoom) {
+
         if (curr - chatRoom.getLong("last_update") > UPDATE_PERIOD_MSEC) {
             chatRoom.put("last_update", curr);
             chatRoomRepository.replaceOne(chatRoom.getObjectId("_id"), chatRoom);
         }
+
     }
 
     private void update2(long curr, Document chatPresence) {

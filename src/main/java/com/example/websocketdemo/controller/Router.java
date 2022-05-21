@@ -46,7 +46,6 @@ public class Router {
         if (auth)
             return userService.getClaims(request);
 
-        System.out.println("heyyyyy5");
         throw new UnAuthException("Token is not valid");
     }
 
@@ -58,7 +57,6 @@ public class Router {
         if (isAuth)
             return userService.getClaims(token);
 
-        System.out.println("heyyyyy4");
         throw new UnAuthException("Token is not valid");
     }
 
@@ -80,7 +78,6 @@ public class Router {
             }
         }
 
-        System.out.println("heyyyyy3");
         throw new UnAuthException("Token is not valid");
     }
 
@@ -97,7 +94,7 @@ public class Router {
                 throw new AuthenticationCredentialsNotFoundException("Has no access");
             }
 
-            if (targetId != null && Target.findInJSONArray(
+            if (targetId != null && Target.findInJSONArrayBool(
                     new JSONArray(user.get("targets").toString()),
                     null, targetId
                     )
@@ -117,7 +114,6 @@ public class Router {
         if (auth != null)
             return auth;
 
-        System.out.println("heyyyyy2");
         throw new AuthenticationCredentialsNotFoundException("Token is not valid");
     }
 }

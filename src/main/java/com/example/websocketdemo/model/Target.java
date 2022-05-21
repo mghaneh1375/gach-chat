@@ -48,8 +48,19 @@ public class Target {
         return targets;
     }
 
-    public static boolean findInJSONArray(JSONArray jsonArray,
-                                          String mode, String id) {
+    public static Target buildFromJSONObject(JSONObject jsonObject) {
+        return new Target(
+                jsonObject.getString("mode").equals(ChatMode.GROUP.name()) ?
+                        ChatMode.GROUP : ChatMode.PEER,
+                new ObjectId(jsonObject.getString("id")),
+                jsonObject.getString("name")
+        );
+    }
+
+    public static List<Target> findManyInJSONArray(JSONArray jsonArray,
+                                         String mode, String id) {
+
+        ArrayList<Target> targets = new ArrayList<>();
 
         for (int i = 0; i < jsonArray.length(); i++) {
 
@@ -60,7 +71,27 @@ public class Target {
                             jsonObject.getString("mode").equalsIgnoreCase(mode) &&
                             jsonObject.getString("id").equals(id)
                     ) ||
-                    (mode == null && jsonObject.getString("id").equals(id))
+                            (mode == null && jsonObject.getString("id").equals(id))
+            )
+                targets.add(Target.buildFromJSONObject(jsonObject));
+        }
+
+        return targets;
+    }
+
+    public static boolean findInJSONArrayBool(JSONArray jsonArray,
+                                         String mode, String id) {
+
+        for (int i = 0; i < jsonArray.length(); i++) {
+
+            JSONObject jsonObject = jsonArray.getJSONObject(i);
+
+            if (
+                    (mode != null &&
+                            jsonObject.getString("mode").equalsIgnoreCase(mode) &&
+                            jsonObject.getString("id").equals(id)
+                    ) ||
+                            (mode == null && jsonObject.getString("id").equals(id))
             )
                 return true;
         }

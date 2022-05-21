@@ -1,10 +1,13 @@
 package com.example.websocketdemo.model;
 
+import static com.example.websocketdemo.utility.Statics.STATICS_SERVER;
+
 public class ChatMessage {
 
     private String content;
     private String id;
     private long timestamp;
+    private boolean isFile;
 
     public String getChatId() {
         return chatId;
@@ -17,6 +20,10 @@ public class ChatMessage {
     private String chatId;
     private String senderId;
     private String sender;
+
+    public boolean isFile() {
+        return isFile;
+    }
 
     public String getSender() {
         return sender;
@@ -61,7 +68,14 @@ public class ChatMessage {
     public ChatMessage(String content, String id,
                        long timestamp, String chatId,
                        String senderId, String sender) {
-        this.content = content;
+
+        isFile = content.startsWith("file&&&");
+
+        if(isFile)
+            this.content = STATICS_SERVER + "chat/" + content.replace("file&&&", "");
+        else
+            this.content = content;
+
         this.id = id;
         this.timestamp = timestamp;
         this.chatId = chatId;

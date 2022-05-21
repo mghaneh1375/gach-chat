@@ -6,14 +6,15 @@ import org.json.JSONObject;
 public class Statics {
 
     //    public final static String STATICS_SERVER = "https://statics.okft.org/";
-    public final static String STATICS_SERVER = "http://185.239.106.26:8083/";
+//    public final static String STATICS_SERVER = "http://185.239.106.26:8083/";
+    public final static String STATICS_SERVER = "http://192.168.0.106/";
 
     public final static boolean DEV_MODE = true;
 
 
     public final static long TOKEN_EXPIRATION_MSEC = 60 * 60 * 24 * 7 * 1000;
 //    public final static long SOCKET_TOKEN_EXPIRATION_MSEC = 60 * 5 * 1000;
-    public final static long SOCKET_TOKEN_EXPIRATION_MSEC = 60 * 2 * 1000;
+    public final static long SOCKET_TOKEN_EXPIRATION_MSEC = 60 * 10 * 1000;
 
     public final static int TOKEN_EXPIRATION = 60 * 60 * 24 * 7;
 

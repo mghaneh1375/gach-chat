@@ -9,6 +9,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
+import static com.example.websocketdemo.utility.Statics.SOCKET_TOKEN_EXPIRATION_MSEC;
+
 @Service
 public class SessionHandler {
 
@@ -59,7 +61,7 @@ public class SessionHandler {
 
                     }
                 },
-                40000
+                SOCKET_TOKEN_EXPIRATION_MSEC
         );
     }
 

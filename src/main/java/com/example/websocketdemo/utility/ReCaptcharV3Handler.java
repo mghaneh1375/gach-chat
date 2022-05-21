@@ -1,6 +1,6 @@
-package bogen.austria.Utility;
+package com.example.websocketdemo.utility;
 
-import bogen.austria.Exception.InvalidFieldsException;
+import com.example.websocketdemo.exception.InvalidFieldsException;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -10,11 +10,8 @@ import org.springframework.web.client.RestTemplate;
 
 public class ReCaptcharV3Handler {
 
-    private String secretKey = "6Le4dHQfAAAAAEFT0BP4xGdlNH5l_OOyoZwi-c9Y";
+    private String secretKey = "6LdAHAAgAAAAACrlCuqSBFuP4CI_l3SBRbtOUlsB";
     private String serverAddress = "https://www.google.com/recaptcha/api/siteverify";
-
-//    private String secretKey = "6LdAHAAgAAAAACrlCuqSBFuP4CI_l3SBRbtOUlsB";
-//    private String serverAddress = "https://www.google.com/recaptcha/api/siteverify";
 
     public float verify(String recaptchaFormResponse) throws InvalidFieldsException {
 

@@ -1,17 +1,20 @@
 package com.example.websocketdemo.controller;
 
-import org.bson.types.ObjectId;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Component;
 
 import javax.inject.Inject;
 
-import static com.example.websocketdemo.controller.Utility.hasAccess;
+import java.util.concurrent.ExecutionException;
+
+import static com.example.websocketdemo.WebsocketDemoApplication.SOCKET_MAX_REQUESTS_PER_MIN;
+import static com.example.websocketdemo.WebsocketDemoApplication.socketRequestCountsPerIpAddress;
 
 @Component
 public class AuthChannelInterceptorAdapter extends Router implements ChannelInterceptor {
@@ -51,6 +54,36 @@ public class AuthChannelInterceptorAdapter extends Router implements ChannelInte
 
         }
 
+        else {
+
+            String sessionId = (String) accessor.getHeader("simpSessionId");
+
+            if(isMaximumRequestsPerSecondExceeded(sessionId)){
+                throw new AuthenticationCredentialsNotFoundException("too many request");
+            }
+
+        }
+
         return message;
+    }
+
+
+    private boolean isMaximumRequestsPerSecondExceeded(String sessionId){
+
+        int requests;
+        try {
+            requests = socketRequestCountsPerIpAddress.get(sessionId);
+
+            if(requests > SOCKET_MAX_REQUESTS_PER_MIN) {
+                socketRequestCountsPerIpAddress.put(sessionId, requests);
+                return true;
+            }
+        } catch (ExecutionException e) {
+            requests = 0;
+        }
+
+        requests++;
+        socketRequestCountsPerIpAddress.put(sessionId, requests);
+        return false;
     }
 }

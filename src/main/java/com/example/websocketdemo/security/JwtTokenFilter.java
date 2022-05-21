@@ -38,7 +38,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                     (isForSocket && jwtTokenProvider.validateSocketToken(token)) ||
                     (!isForSocket && jwtTokenProvider.validateAuthToken(token))
                 ) {
-                    Authentication auth = jwtTokenProvider.getAuthentication(token);
+                    Authentication auth = jwtTokenProvider.getAuthentication(token, isForSocket);
                     SecurityContextHolder.getContext().setAuthentication(auth);
                     return true;
                 }
@@ -56,7 +56,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
         if(token != null) {
             try {
                 if (jwtTokenProvider.validateSocketToken(token)) {
-                    Authentication auth = jwtTokenProvider.getAuthentication(token);
+                    Authentication auth = jwtTokenProvider.getAuthentication(token, true);
                     SecurityContextHolder.getContext().setAuthentication(auth);
                     return auth;
                 }
