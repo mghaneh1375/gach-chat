@@ -224,6 +224,7 @@ public class ChatController extends Router {
         if(cached.expireAt < curr)
             return JSON_NOT_ACCESS;
 
+        System.out.println("rece file successfully");
         doSendMsg(
                 "file&&&" + cached.filename + "##" + cached.path,
                 cached.id,
@@ -688,11 +689,13 @@ public class ChatController extends Router {
                            long curr, String user_name, String pic,
                            Document chatRoom) {
 
+        System.out.println("sending notif");
+
         boolean amIStarter = false;
         long lastSeenTarget = -1;
         List<Document> persons = null;
 
-        if (chatRoom.getString("mode").equals("peer")) {
+        if (chatRoom.getString("mode").equalsIgnoreCase("peer")) {
 
             if (!chatRoom.getObjectId("sender_id").equals(senderId) &&
                     !chatRoom.getObjectId("receiver_id").equals(senderId)
@@ -811,6 +814,7 @@ public class ChatController extends Router {
                 chatMessage
         );
 
+        System.out.println("calling update method");
         update(curr, chatRoom);
     }
 
@@ -837,7 +841,11 @@ public class ChatController extends Router {
 
     private void update(long curr, Document chatRoom) {
 
+        System.out.println("wanting update");
+
         if (curr - chatRoom.getLong("last_update") > UPDATE_PERIOD_MSEC) {
+            System.out.println("doing update");
+            System.out.println(chatRoom.getList("chats", Document.class).size());
             chatRoom.put("last_update", curr);
             chatRoomRepository.replaceOne(chatRoom.getObjectId("_id"), chatRoom);
         }
