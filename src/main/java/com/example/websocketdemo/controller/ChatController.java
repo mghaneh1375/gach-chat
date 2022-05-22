@@ -177,6 +177,8 @@ public class ChatController extends Router {
         if (chat == null)
             throw new NotAccessException("not access");
 
+        chat = chatRoomRepository.findById(chat.getObjectId("_id"));
+
         String nonce = senderId.toString() + "_" + System.currentTimeMillis();
         String filename = jsonObject.getString("filename");
 
@@ -224,7 +226,8 @@ public class ChatController extends Router {
         if(cached.expireAt < curr)
             return JSON_NOT_ACCESS;
 
-        System.out.println("rece file successfully");
+        System.out.println("recv file successfully");
+
         doSendMsg(
                 "file&&&" + cached.filename + "##" + cached.path,
                 cached.id,
@@ -726,6 +729,10 @@ public class ChatController extends Router {
         ObjectId newChatId = new ObjectId();
 
         List<Document> chats = chatRoom.getList("chats", Document.class);
+
+        System.out.println("chat size is " + chats.size());
+        System.out.println("content is " + content);
+
         Document chat = new Document("content", content)
                 .append("created_at", curr)
                 .append("sender", senderId)
@@ -734,6 +741,7 @@ public class ChatController extends Router {
                 ;
 
         chats.add(chat);
+        System.out.println("added");
 
         ChatMessage chatMessage = new ChatMessage(
                 content,
