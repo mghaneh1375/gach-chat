@@ -1,10 +1,13 @@
 package com.example.websocketdemo.model;
 
+import com.example.websocketdemo.db.UserRepository;
 import org.bson.types.ObjectId;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.List;
+
+import static com.example.websocketdemo.utility.Statics.STATICS_SERVER;
 
 public class Target {
     public ObjectId getClassId() {
@@ -26,7 +29,7 @@ public class Target {
         this.targetId = targetId;
         this.targetName = targetName;
         classId = null;
-        targetPic = null;
+        targetPic = "";
     }
 
     public Target(ObjectId targetId,
@@ -66,26 +69,6 @@ public class Target {
         return null;
     }
 
-    public static boolean findInJSONArrayBool(JSONArray jsonArray,
-                                         String mode, String id) {
-
-        for (int i = 0; i < jsonArray.length(); i++) {
-
-            JSONObject jsonObject = jsonArray.getJSONObject(i);
-
-            if (
-                    (mode != null &&
-                            jsonObject.getString("mode").equalsIgnoreCase(mode) &&
-                            jsonObject.getString("id").equals(id)
-                    ) ||
-                            (mode == null && jsonObject.getString("id").equals(id))
-            )
-                return true;
-        }
-
-        return false;
-    }
-
     public ChatMode getChatMode() {
         return chatMode;
     }
@@ -108,8 +91,10 @@ public class Target {
 //        if(classId != null)
 //            jsonObject.put("classId", classId);
 
-        if(targetPic != null)
-            jsonObject.put("targetPic", targetPic);
+        if(targetPic != null && !targetPic.isEmpty())
+            jsonObject.put("targetPic", STATICS_SERVER + UserRepository.FOLDER + "/" + targetPic);
+        else
+            jsonObject.put("targetPic", "");
 
         return jsonObject;
     }
