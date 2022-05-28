@@ -29,7 +29,7 @@ public class WebsocketDemoApplication {
 	public static ChatRoomRepository chatRoomRepository;
 	public static ChatPresenceRepository chatPresenceRepository;
 
-	public static final int SOCKET_MAX_REQUESTS_PER_MIN = 90; //or whatever you want it to be
+	public static final int SOCKET_MAX_REQUESTS_PER_MIN = 300; //or whatever you want it to be
 	public static LoadingCache<String, Integer> socketRequestCountsPerIpAddress;
 
 	private static void setupDB() {

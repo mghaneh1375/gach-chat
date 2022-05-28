@@ -21,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -365,7 +366,11 @@ public class ChatController extends Router {
             excludes.add(target.getTargetId());
         }
 
-        return Utility.generateSuccessMsg("chats", jsonArray);
+        return Utility.generateSuccessMsg(
+                new PairValue("chats", jsonArray),
+                new PairValue("heartBeatInterval", HEART_BEAT),
+                new PairValue("validityDuration", SOCKET_TOKEN_EXPIRATION_MSEC)
+        );
     }
 
     @GetMapping(value = "/api/chat/{mode}/{receiverId}/{lastCreatedAt}")
