@@ -74,6 +74,8 @@ public class AuthChannelInterceptorAdapter extends Router implements ChannelInte
                 return true;
 
         } catch (ExecutionException e) {
+            System.out.println(e.getMessage());
+            e.printStackTrace();
             return true;
         }
 
