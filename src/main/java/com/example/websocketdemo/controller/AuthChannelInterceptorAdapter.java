@@ -37,7 +37,7 @@ public class AuthChannelInterceptorAdapter extends Router implements ChannelInte
         }
 
         if (StompCommand.CONNECT == accessor.getCommand()) {
-//            System.out.println(accessor.toString());
+            System.out.println(accessor.toString());
 //            System.out.println(accessor.getFirstNativeHeader("token"));
 //            accessor.setUser(webSocketAuthenticatorService.getAuthenticatedOrFail(accessor.getFirstNativeHeader("token")));
 //            System.out.println("success");
