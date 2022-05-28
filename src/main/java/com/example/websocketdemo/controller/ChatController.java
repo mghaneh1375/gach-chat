@@ -39,7 +39,7 @@ public class ChatController extends Router {
 
     private final static Integer UPDATE_PERIOD_MSEC = 60000;
     private final static Integer UPDATE_BACK_PERIOD_MSEC = HEART_BEAT + 1000;
-    private final static Integer PER_PAGE = 7;
+    private final static Integer PER_PAGE = 30;
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;

@@ -14,10 +14,6 @@ import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoDatabase;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.FilterType;
-import org.springframework.web.socket.config.annotation.DelegatingWebSocketMessageBrokerConfiguration;
-import org.springframework.web.socket.messaging.SubProtocolWebSocketHandler;
 
 import java.util.concurrent.TimeUnit;
 
@@ -33,7 +29,7 @@ public class WebsocketDemoApplication {
 	public static ChatRoomRepository chatRoomRepository;
 	public static ChatPresenceRepository chatPresenceRepository;
 
-	public static final int SOCKET_MAX_REQUESTS_PER_MIN = 50; //or whatever you want it to be
+	public static final int SOCKET_MAX_REQUESTS_PER_MIN = 35; //or whatever you want it to be
 	public static LoadingCache<String, Integer> socketRequestCountsPerIpAddress;
 
 	private static void setupDB() {

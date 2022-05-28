@@ -2,7 +2,6 @@ package com.example.websocketdemo.security;
 
 import com.example.websocketdemo.db.UserRepository;
 import com.example.websocketdemo.exception.CustomException;
-import com.example.websocketdemo.exception.InvalidFieldsException;
 import com.example.websocketdemo.model.ChatMode;
 import com.example.websocketdemo.model.Target;
 import com.example.websocketdemo.utility.Authorization;
@@ -92,18 +91,18 @@ public class JwtTokenProvider {
         return Base64.getEncoder().encodeToString(isForSocket ? secretSocketKey.getBytes() : secretKey.getBytes());
     }
 
-    public String createToken(Document user)
-            throws InvalidFieldsException {
+    public String createToken(Document user) {
 
         ObjectId userId = user.getObjectId("_id");
         Token oldToken = null;
+        long curr = System.currentTimeMillis();
 
         if (cachedTokens.containsKey(userId)) {
 
-            if (System.currentTimeMillis() < cachedTokens.get(userId).getExpiredAt())
+            if (curr + SOCKET_TOKEN_CAUTION_TIME < cachedTokens.get(userId).getExpiredAt())
                 return cachedTokens.get(userId).getToken();
 
-            if (System.currentTimeMillis() - cachedTokens.get(userId).getExpiredAt() < 2 * SOCKET_TOKEN_EXPIRATION_MSEC)
+            if (curr - cachedTokens.get(userId).getExpiredAt() < 2 * SOCKET_TOKEN_EXPIRATION_MSEC)
                 oldToken = cachedTokens.get(userId);
         }
 
@@ -115,27 +114,22 @@ public class JwtTokenProvider {
 
         if (oldToken != null) {
 
+            Claims e = null;
+
             try {
-                Jwts.parser().setSigningKey(getSharedKeyBytes(true)).parseClaimsJws(oldToken.getToken());
-                return oldToken.getToken();
-
-            } catch (ExpiredJwtException e) {
-
-                if (!e.getClaims().get("user_id").equals(userId.toString()))
-                    throw new InvalidFieldsException("invalid old token 1");
-
-                if (!e.getClaims().get("digest").equals(
-                        e.getClaims().get("user_id") + "_" + e.getClaims().getSubject() + "_" +
-                                e.getClaims().get("access")
-                ))
-                    throw new InvalidFieldsException("invalid old token 2");
-
-                reuse = (int) e.getClaims().get("reuse");
-                if (reuse >= TOKEN_REUSABLE)
-                    reuse = 0;
-                else {
-                    reuse++;
-                    reFillTargets = false;
+                 e = Jwts.parser().setSigningKey(getSharedKeyBytes(true)).parseClaimsJws(oldToken.getToken()).getBody();
+            } catch (ExpiredJwtException ex) {
+                e = ex.getClaims();
+            }
+            finally {
+                if(e != null) {
+                    reuse = (int) e.get("reuse");
+                    if (reuse >= TOKEN_REUSABLE)
+                        reuse = 0;
+                    else {
+                        reuse++;
+                        reFillTargets = false;
+                    }
                 }
             }
         } else
