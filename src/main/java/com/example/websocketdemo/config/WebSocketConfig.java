@@ -54,7 +54,7 @@ public class WebSocketConfig extends WebSocketMessageBrokerConfigurationSupport 
         te.initialize();
 
         config.enableSimpleBroker("/chat")
-                .setHeartbeatValue(new long[]{30000, 30000})
+                .setHeartbeatValue(new long[]{0, 0})
                 .setTaskScheduler(te);;
         config.setApplicationDestinationPrefixes("/app");
         config.setUserDestinationPrefix("/user");
