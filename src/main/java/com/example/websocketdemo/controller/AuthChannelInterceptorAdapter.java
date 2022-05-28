@@ -8,8 +8,6 @@ import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.handler.WebSocketSessionDecorator;
-import org.springframework.web.socket.sockjs.transport.SockJsSession;
 
 import javax.inject.Inject;
 
@@ -32,7 +30,11 @@ public class AuthChannelInterceptorAdapter extends Router implements ChannelInte
     public Message<?> preSend(final Message<?> message, final MessageChannel channel) {
         final StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-        System.out.println(accessor.getCommand().toString());
+        String ip = accessor.getSessionAttributes().get("ip").toString();
+
+        if(isMaximumRequestsPerSecondExceeded(ip)){
+            throw new AuthenticationCredentialsNotFoundException("too many request");
+        }
 
         if (StompCommand.CONNECT == accessor.getCommand()) {
 //            System.out.println(accessor.toString());
@@ -57,25 +59,16 @@ public class AuthChannelInterceptorAdapter extends Router implements ChannelInte
 
         }
 
-        else {
-
-            String sessionId = (String) accessor.getHeader("simpSessionId");
-
-            if(isMaximumRequestsPerSecondExceeded(sessionId)){
-                throw new AuthenticationCredentialsNotFoundException("too many request");
-            }
-
-        }
-
         return message;
     }
 
 
-    private boolean isMaximumRequestsPerSecondExceeded(String sessionId){
+    private boolean isMaximumRequestsPerSecondExceeded(String ip){
 
         int requests;
         try {
-            requests = socketRequestCountsPerIpAddress.get(sessionId);
+            requests = socketRequestCountsPerIpAddress.get(ip);
+            System.out.println(ip + "  :  " + requests);
 
             if(requests > SOCKET_MAX_REQUESTS_PER_MIN)
                 return true;
@@ -85,7 +78,7 @@ public class AuthChannelInterceptorAdapter extends Router implements ChannelInte
         }
 
         requests++;
-        socketRequestCountsPerIpAddress.put(sessionId, requests);
+        socketRequestCountsPerIpAddress.put(ip, requests);
         return false;
     }
 }

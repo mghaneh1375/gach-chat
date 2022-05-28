@@ -35,11 +35,17 @@ public class WebSocketConfig extends WebSocketMessageBrokerConfigurationSupport 
         if(DEV_MODE)
             registry
                     .addEndpoint("/ws")
+                    .addInterceptors(
+                            new IpHandshakeInterceptor()
+                    )
                     .setAllowedOriginPatterns("*")
                     .withSockJS();
         else
             registry
                     .addEndpoint("/ws")
+                    .addInterceptors(
+                            new IpHandshakeInterceptor()
+                    )
                     .setAllowedOrigins("https://okft.org")
                     .withSockJS();
 

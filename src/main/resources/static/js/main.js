@@ -222,15 +222,15 @@ function heartBeatHandler() {
 
     timer = setInterval(function () {
         sendHeart();
-    }, 5000);
+    }, 30000);
 
     getChats();
 }
 
 function sendHeart() {
 
-    if(1 == 1)
-        return;
+    // if(1 == 1)
+    //     return;
 
     if(stompClient) {
 
@@ -251,14 +251,15 @@ function login(username) {
 
     $.ajax({
         type: 'post',
-        url: loginUrl + 'api/user/chatSignIn',
+        url: loginUrl + 'api/user/signIn',
         headers: {
             "Content-Type": "application/json",
             "Accept": "application/json"
         },
         data: JSON.stringify({
             username: username,
-            password: "1"
+            password: "1",
+            captcha: "s"
         }),
         success: function (res) {
 
