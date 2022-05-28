@@ -11,15 +11,17 @@ import org.springframework.messaging.handler.invocation.HandlerMethodReturnValue
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.messaging.support.AbstractSubscribableChannel;
+
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.config.annotation.*;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurationSupport;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
-import org.springframework.web.socket.messaging.SubProtocolWebSocketHandler;
 
 import java.util.List;
+
+import static com.example.websocketdemo.utility.Statics.DEV_MODE;
 
 @Configuration
 @EnableWebSocketMessageBroker
@@ -28,15 +30,18 @@ public class WebSocketConfig extends WebSocketMessageBrokerConfigurationSupport 
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry
-                .addEndpoint("/ws")
-                .setAllowedOrigins("https://okft.org")
-//                .setAllowedOrigins("http://185.239.106.26")
-//                .setAllowedOrigins("http://localhost:3000")
-//                .setAllowedOrigins("http://localhost:8088")
-//                .setAllowedOrigins("http://127.0.0.1:5500")
-//		.setAllowedOriginPatterns("*")
-                .withSockJS();
+
+        if(DEV_MODE)
+            registry
+                    .addEndpoint("/ws")
+                    .setAllowedOriginPatterns("*")
+                    .withSockJS();
+        else
+            registry
+                    .addEndpoint("/ws")
+                    .setAllowedOrigins("https://okft.org")
+                    .withSockJS();
+
     }
 
     @Override

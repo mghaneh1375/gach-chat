@@ -30,6 +30,8 @@ public class AuthChannelInterceptorAdapter extends Router implements ChannelInte
     public Message<?> preSend(final Message<?> message, final MessageChannel channel) {
         final StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
+        System.out.println(accessor.getCommand().toString());
+
         if (StompCommand.CONNECT == accessor.getCommand()) {
 //            System.out.println(accessor.toString());
 //            System.out.println(accessor.getFirstNativeHeader("token"));
@@ -74,12 +76,11 @@ public class AuthChannelInterceptorAdapter extends Router implements ChannelInte
         try {
             requests = socketRequestCountsPerIpAddress.get(sessionId);
 
-            if(requests > SOCKET_MAX_REQUESTS_PER_MIN) {
-                socketRequestCountsPerIpAddress.put(sessionId, requests);
+            if(requests > SOCKET_MAX_REQUESTS_PER_MIN)
                 return true;
-            }
+
         } catch (ExecutionException e) {
-            requests = 0;
+            return true;
         }
 
         requests++;

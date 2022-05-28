@@ -229,6 +229,9 @@ function heartBeatHandler() {
 
 function sendHeart() {
 
+    if(1 == 1)
+        return;
+
     if(stompClient) {
 
         var msg = {

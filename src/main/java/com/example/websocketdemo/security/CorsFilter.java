@@ -9,6 +9,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
+import static com.example.websocketdemo.utility.Statics.DEV_MODE;
+
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -32,21 +34,28 @@ public class CorsFilter implements Filter {
 //        //SEND OK or validate
         if ("OPTIONS".equalsIgnoreCase(((HttpServletRequest) req).getMethod())) {
 
-            if(((HttpServletRequest) req).getHeader("Origin") == null ||
-                !((HttpServletRequest) req).getHeader("Origin").equals("https://okft.org"))
-            {
-                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                return;
+            if(!DEV_MODE) {
+
+                if(((HttpServletRequest) req).getHeader("Origin") == null ||
+                        !((HttpServletRequest) req).getHeader("Origin").equals("https://okft.org"))
+                {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    return;
+                }
+
             }
 
             response.setStatus(HttpServletResponse.SC_OK);
         } else {
-            if(((HttpServletRequest) req).getHeader("Referer") == null ||
-                !((HttpServletRequest) req).getHeader("Referer").contains("https://okft.org"))
-            {
-                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                return;
+
+            if(!DEV_MODE) {
+                if (((HttpServletRequest) req).getHeader("Referer") == null ||
+                        !((HttpServletRequest) req).getHeader("Referer").contains("https://okft.org")) {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    return;
+                }
             }
+
             chain.doFilter(req, res);
         }
     }
