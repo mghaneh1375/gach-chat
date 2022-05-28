@@ -30,11 +30,11 @@ public class AuthChannelInterceptorAdapter extends Router implements ChannelInte
     public Message<?> preSend(final Message<?> message, final MessageChannel channel) {
         final StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-//        String ip = accessor.getSessionAttributes().get("ip").toString();
-//
-//        if(isMaximumRequestsPerSecondExceeded(ip)){
-//            throw new AuthenticationCredentialsNotFoundException("too many request");
-//        }
+        String ip = accessor.getSessionAttributes().get("ip").toString();
+
+        if(isMaximumRequestsPerSecondExceeded(ip)){
+            throw new AuthenticationCredentialsNotFoundException("too many request");
+        }
 
         System.out.println(accessor.getCommand());
 
@@ -55,8 +55,6 @@ public class AuthChannelInterceptorAdapter extends Router implements ChannelInte
                         accessor.getFirstNativeHeader("token"), null,
                         splited[splited.length - 1]
                 );
-
-//                hasAccess(userId, splited[splited.length - 1]);
             }
 
         }

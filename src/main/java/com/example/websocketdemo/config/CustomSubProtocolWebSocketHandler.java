@@ -13,12 +13,11 @@ public class CustomSubProtocolWebSocketHandler extends SubProtocolWebSocketHandl
 
     public CustomSubProtocolWebSocketHandler(MessageChannel clientInboundChannel, SubscribableChannel clientOutboundChannel) {
         super(clientInboundChannel, clientOutboundChannel);
-        setSendTimeLimit(10 * 60 * 1000);
     }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-//        sessionHandler.register(session);
+        sessionHandler.register(session);
         super.afterConnectionEstablished(session);
     }
 
