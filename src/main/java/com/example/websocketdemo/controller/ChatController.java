@@ -1,5 +1,6 @@
 package com.example.websocketdemo.controller;
 
+import com.example.websocketdemo.db.UserRepository;
 import com.example.websocketdemo.exception.NotAccessException;
 import com.example.websocketdemo.exception.NotActivateAccountException;
 import com.example.websocketdemo.exception.UnAuthException;
@@ -89,18 +90,16 @@ public class ChatController extends Router {
     private class UserChatDocument {
 
         Document document;
-        String pic;
         ObjectId id;
         String name;
         String filename;
         String path;
         long expireAt;
 
-        public UserChatDocument(Document document, String pic,
+        public UserChatDocument(Document document,
                                 ObjectId id, String name,
                                 String filename, String path) {
             this.document = document;
-            this.pic = pic;
             this.id = id;
             this.name = name;
             this.filename = filename;
@@ -177,12 +176,13 @@ public class ChatController extends Router {
         if (chat == null)
             throw new NotAccessException("not access");
 
+        chat = chatRoomRepository.findById(chat.getObjectId("_id"));
+
         String nonce = senderId.toString() + "_" + System.currentTimeMillis();
         String filename = jsonObject.getString("filename");
 
         cachedUserChatDocs.put(nonce, new UserChatDocument(
                 chat,
-                user.get("pic").toString(),
                 senderId,
                 user.get("name").toString(),
                 filename,
@@ -229,7 +229,6 @@ public class ChatController extends Router {
                 cached.id,
                 curr,
                 cached.name,
-                cached.pic,
                 cached.document
         );
 
@@ -313,13 +312,10 @@ public class ChatController extends Router {
             JSONObject jsonObject = new JSONObject()
                     .put("receiverName", t.getTargetName())
                     .put("receiverId", t.getTargetId())
+                    .put("pic", STATICS_SERVER + UserRepository.FOLDER + "/" + t.getTargetPic())
                     .put("mode", t.getChatMode().toString());
 
             if (t.getChatMode().toString().equals("peer")) {
-//                System.out.println(amISender);
-//                System.out.println(amISender ?
-//                        chat.getInteger("new_msgs") :
-//                        chat.getInteger("new_msgs_rev"));
 
                 jsonObject.put("newMsgs", amISender ?
                         chat.getInteger("new_msgs") :
@@ -355,10 +351,14 @@ public class ChatController extends Router {
             if (excludes.contains(target.getTargetId()))
                 continue;
 
+            if(isTeacher && target.getChatMode().equals(ChatMode.PEER))
+                continue;
+
             jsonArray.put(new JSONObject()
                     .put("receiverName", target.getTargetName())
                     .put("receiverId", target.getTargetId())
                     .put("mode", target.getChatMode().toString())
+                    .put("pic", STATICS_SERVER + UserRepository.FOLDER + "/" + target.getTargetPic())
                     .put("newMsgs", 0)
             );
 
@@ -518,10 +518,8 @@ public class ChatController extends Router {
 //                    .put("status", chat.getString("status"))
                     ;
 
-            if (sender != null) {
+            if (sender != null)
                 jsonObject.put("sender", sender.getTargetName());
-                jsonObject.put("pic", sender.getTargetPic());
-            }
 
             stack.push(jsonObject);
 
@@ -651,8 +649,7 @@ public class ChatController extends Router {
 
                 case "send":
                     sendMsg(jsonObject, senderId,
-                            curr, (String) user.get("name"),
-                            (String) user.get("pic")
+                            curr, (String) user.get("name")
                     );
                     return;
 
@@ -667,7 +664,7 @@ public class ChatController extends Router {
 
 
     private void sendMsg(JSONObject jsonObject, ObjectId senderId,
-                         long curr, String user_name, String pic) {
+                         long curr, String user_name) {
 
         if (!jsonObject.has("chatId") ||
                 !jsonObject.has("content")
@@ -680,19 +677,19 @@ public class ChatController extends Router {
             return;
 
         doSendMsg(jsonObject.getString("content"),
-                senderId, curr, user_name, pic, chatRoom
+                senderId, curr, user_name, chatRoom
         );
     }
 
     private void doSendMsg(String content, ObjectId senderId,
-                           long curr, String user_name, String pic,
+                           long curr, String user_name,
                            Document chatRoom) {
 
         boolean amIStarter = false;
         long lastSeenTarget = -1;
         List<Document> persons = null;
 
-        if (chatRoom.getString("mode").equals("peer")) {
+        if (chatRoom.getString("mode").equalsIgnoreCase("peer")) {
 
             if (!chatRoom.getObjectId("sender_id").equals(senderId) &&
                     !chatRoom.getObjectId("receiver_id").equals(senderId)
@@ -723,6 +720,7 @@ public class ChatController extends Router {
         ObjectId newChatId = new ObjectId();
 
         List<Document> chats = chatRoom.getList("chats", Document.class);
+
         Document chat = new Document("content", content)
                 .append("created_at", curr)
                 .append("sender", senderId)
@@ -738,7 +736,7 @@ public class ChatController extends Router {
                 curr,
                 chatRoom.getObjectId("_id").toString(),
                 senderId.toString(),
-                user_name, pic
+                user_name
         );
 
         if (curr - lastSeenTarget > UPDATE_BACK_PERIOD_MSEC) {
@@ -836,12 +834,10 @@ public class ChatController extends Router {
     }
 
     private void update(long curr, Document chatRoom) {
-
         if (curr - chatRoom.getLong("last_update") > UPDATE_PERIOD_MSEC) {
             chatRoom.put("last_update", curr);
             chatRoomRepository.replaceOne(chatRoom.getObjectId("_id"), chatRoom);
         }
-
     }
 
     private void update2(long curr, Document chatPresence) {

@@ -8,15 +8,10 @@ public class ChatMessage {
     private String id;
     private long timestamp;
     private boolean isFile;
-    private String pic;
     private String originalFilename;
 
     public String getOriginalFilename() {
         return originalFilename;
-    }
-
-    public String getPic() {
-        return pic;
     }
 
     public String getChatId() {
@@ -77,8 +72,7 @@ public class ChatMessage {
 
     public ChatMessage(String content, String id,
                        long timestamp, String chatId,
-                       String senderId, String sender,
-                       String pic) {
+                       String senderId, String sender) {
 
         isFile = content.startsWith("file&&&");
 
@@ -97,6 +91,5 @@ public class ChatMessage {
         this.chatId = chatId;
         this.senderId = senderId;
         this.sender = sender;
-        this.pic = pic;
     }
 }
