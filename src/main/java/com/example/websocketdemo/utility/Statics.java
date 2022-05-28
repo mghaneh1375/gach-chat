@@ -12,7 +12,6 @@ public class Statics {
     public final static boolean DEV_MODE = false;
 
 
-//    public final static long SOCKET_TOKEN_EXPIRATION_MSEC = 60 * 5 * 1000;
     public final static long SOCKET_TOKEN_EXPIRATION_MSEC = 60 * 10 * 1000;
     public final static long SOCKET_TOKEN_CAUTION_TIME = 40 * 1000;
 

@@ -8,6 +8,8 @@ import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Component;
+import org.springframework.web.socket.handler.WebSocketSessionDecorator;
+import org.springframework.web.socket.sockjs.transport.SockJsSession;
 
 import javax.inject.Inject;
 
@@ -37,7 +39,6 @@ public class AuthChannelInterceptorAdapter extends Router implements ChannelInte
 //            System.out.println(accessor.getFirstNativeHeader("token"));
 //            accessor.setUser(webSocketAuthenticatorService.getAuthenticatedOrFail(accessor.getFirstNativeHeader("token")));
 //            System.out.println("success");
-
         } else if (StompCommand.SUBSCRIBE == accessor.getCommand()) {
 
             if (accessor.getFirstNativeHeader("self-subscribe") != null) {
