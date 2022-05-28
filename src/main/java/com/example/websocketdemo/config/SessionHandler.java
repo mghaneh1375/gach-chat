@@ -6,18 +6,13 @@ import org.springframework.web.socket.WebSocketSession;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 
 import static com.example.websocketdemo.utility.Statics.SOCKET_TOKEN_EXPIRATION_MSEC;
 
 @Service
 public class SessionHandler {
 
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-
     private final Map<String, WebSocketSession> sessionMap = new ConcurrentHashMap<>();
-    private static boolean my = false;
 
     public SessionHandler() {
 
@@ -42,22 +37,17 @@ public class SessionHandler {
                     @Override
                     public void run() {
 
-                        if(my)
-                            return;
-
-                        sessionMap.keySet().forEach(k -> {
+                        for(String k : sessionMap.keySet()) {
                             try {
-                                System.out.println(sessionMap.get(k).getId());
                                 if(sessionMap.get(k).getId().equals(sessionId)) {
                                     sessionMap.get(k).close();
                                     sessionMap.remove(k);
-                                    my = true;
-                                    return;
+                                    break;
                                 }
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }
-                        });
+                        }
 
                     }
                 },
