@@ -1,6 +1,5 @@
 package com.example.websocketdemo.utility;
 
-import com.mongodb.BasicDBObject;
 import org.json.JSONObject;
 
 public class Statics {
@@ -19,7 +18,7 @@ public class Statics {
     public final static int CLASS_EXPIRATION_SEC = 60 * 60 * 24 * 7;
 
     public final static int TOKEN_REUSABLE = 3;
-    public final static int HEART_BEAT = 60000;
+    public final static int HEART_BEAT = 10000;
 
     public static final String JSON_NOT_ACCESS = new JSONObject().put("status", "nok").put("msg", "no access to this method").toString();
     public static final String JSON_NOT_VALID_PARAMS = new JSONObject().put("status", "nok").put("msg", "params is not valid").toString();

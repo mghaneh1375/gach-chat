@@ -81,7 +81,7 @@ public class Target {
         return targetName;
     }
 
-    private JSONObject toJSONObject() {
+    public JSONObject toJSONObject() {
 
         JSONObject jsonObject = new JSONObject()
 //                .put("mode", chatMode.name())
@@ -91,11 +91,16 @@ public class Target {
 //        if(classId != null)
 //            jsonObject.put("classId", classId);
 
-        if(targetPic != null && !targetPic.isEmpty())
-            jsonObject.put("targetPic", STATICS_SERVER + UserRepository.FOLDER + "/" + targetPic);
-        else
-            jsonObject.put("targetPic", "");
-
+        jsonObject.put("targetPic", getPicUrl());
         return jsonObject;
+    }
+
+    public String getPicUrl() {
+
+        if (targetPic != null && !targetPic.isEmpty())
+            return STATICS_SERVER + UserRepository.FOLDER + "/" + targetPic;
+
+        return STATICS_SERVER + UserRepository.FOLDER + "/default.jpeg";
+
     }
 }

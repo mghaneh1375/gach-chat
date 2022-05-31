@@ -63,7 +63,7 @@ public class AuthChannelInterceptorAdapter extends Router implements ChannelInte
     }
 
 
-    private boolean isMaximumRequestsPerSecondExceeded(String ip){
+    private boolean isMaximumRequestsPerSecondExceeded(final String ip){
 
         int requests;
         try {
@@ -79,6 +79,18 @@ public class AuthChannelInterceptorAdapter extends Router implements ChannelInte
             return true;
         }
 
+        if(requests == 0) {
+
+            new java.util.Timer().schedule(
+                    new java.util.TimerTask() {
+
+                        @Override
+                        public void run() {
+                            socketRequestCountsPerIpAddress.put(ip, 0);
+                        }
+                    }, 60000
+            );
+        }
         requests++;
         socketRequestCountsPerIpAddress.put(ip, requests);
         return false;

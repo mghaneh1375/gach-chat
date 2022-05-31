@@ -76,10 +76,12 @@ public class ChatController extends Router {
         }
 
         try {
-            String token = jwtTokenProvider.createToken(user);
+            PairValue p = jwtTokenProvider.createToken(user);
+            String token = (String) p.getKey();
 
             return Utility.generateSuccessMsg(
                     new PairValue("token", token),
+                    new PairValue("reminder", p.getValue()),
                     new PairValue("heartBeatInterval", HEART_BEAT),
                     new PairValue("validityDuration", SOCKET_TOKEN_EXPIRATION_MSEC)
             );
@@ -144,7 +146,7 @@ public class ChatController extends Router {
                 null, targetId
         );
 
-        if(target == null)
+        if (target == null)
             throw new NotAccessException("not access");
 
         ObjectId senderId = (ObjectId) user.get("_id");
@@ -214,7 +216,7 @@ public class ChatController extends Router {
                 new PairValue("nonce", nonce)
         );
 
-        if(!cachedUserChatDocs.containsKey(nonce))
+        if (!cachedUserChatDocs.containsKey(nonce))
             return JSON_NOT_VALID_PARAMS;
 
         UserChatDocument cached = cachedUserChatDocs.get(nonce);
@@ -222,7 +224,7 @@ public class ChatController extends Router {
 
         long curr = System.currentTimeMillis();
 
-        if(cached.expireAt < curr)
+        if (cached.expireAt < curr)
             return JSON_NOT_ACCESS;
 
         doSendMsg(
@@ -243,6 +245,8 @@ public class ChatController extends Router {
             throws UnAuthException {
 
         HashMap<String, Object> user = getClaims(request);
+        if(user.get("access").toString().equals(Access.STUDENT.getName()))
+            return JSON_NOT_ACCESS;
 
         final List<Target> targets = (List<Target>) user.get("targets");
 
@@ -313,7 +317,7 @@ public class ChatController extends Router {
             JSONObject jsonObject = new JSONObject()
                     .put("receiverName", t.getTargetName())
                     .put("receiverId", t.getTargetId())
-                    .put("pic", STATICS_SERVER + UserRepository.FOLDER + "/" + t.getTargetPic())
+                    .put("pic", t.getPicUrl())
                     .put("mode", t.getChatMode().toString());
 
             if (t.getChatMode().toString().equals("peer")) {
@@ -352,14 +356,14 @@ public class ChatController extends Router {
             if (excludes.contains(target.getTargetId()))
                 continue;
 
-            if(isTeacher && target.getChatMode().equals(ChatMode.PEER))
+            if (isTeacher && target.getChatMode().equals(ChatMode.PEER))
                 continue;
 
             jsonArray.put(new JSONObject()
                     .put("receiverName", target.getTargetName())
                     .put("receiverId", target.getTargetId())
                     .put("mode", target.getChatMode().toString())
-                    .put("pic", STATICS_SERVER + UserRepository.FOLDER + "/" + target.getTargetPic())
+                    .put("pic", target.getPicUrl())
                     .put("newMsgs", 0)
             );
 
@@ -370,6 +374,87 @@ public class ChatController extends Router {
                 new PairValue("chats", jsonArray),
                 new PairValue("heartBeatInterval", HEART_BEAT),
                 new PairValue("validityDuration", SOCKET_TOKEN_EXPIRATION_MSEC)
+        );
+    }
+
+    @GetMapping(value = "/api/getFiles/{chatId}")
+    @ResponseBody
+    public String getFiles(HttpServletRequest request,
+                           @PathVariable @ObjectIdConstraint ObjectId chatId)
+            throws UnAuthException {
+
+        Document chat = chatRoomRepository.findById(chatId);
+        if (chat == null)
+            return JSON_NOT_VALID_PARAMS;
+
+        HashMap<String, Object> user = getClaims(request);
+        ObjectId senderId = (ObjectId) user.get("_id");
+        ChatMode chatMode = chat.getString("mode").equalsIgnoreCase(ChatMode.GROUP.getName()) ?
+                ChatMode.GROUP : ChatMode.PEER;
+
+        ObjectId targetId = chatMode == ChatMode.GROUP || senderId.equals(chat.getObjectId("sender_id")) ?
+                chat.getObjectId("receiver_id") :
+                chat.getObjectId("sender_id");
+
+        List<Target> targets = (List<Target>) user.get("targets");
+        if (searchInTargets(targets, chatMode, targetId) == null)
+            return JSON_NOT_ACCESS;
+
+        List<Document> chats = chat.getList("chats", Document.class);
+        JSONArray jsonArray = new JSONArray();
+
+        for (Document msg : chats) {
+
+            if (!msg.getString("content").startsWith("file&&&"))
+                continue;
+
+            String content = msg.getString("content");
+            String originalFilename = "";
+
+            String[] splited = content.replace("file&&&", "").split("##");
+            content = STATICS_SERVER + "chat/" + splited[1];
+            originalFilename = splited[0];
+
+            jsonArray.put(new JSONObject()
+                    .put("content", content)
+                    .put("originalFilename", originalFilename)
+                    .put("createdAt", msg.getLong("created_at"))
+            );
+        }
+
+        return Utility.generateSuccessMsg(
+                new PairValue("chats", jsonArray)
+        );
+    }
+
+    @GetMapping(value = "/api/search")
+    @ResponseBody
+    public String search(HttpServletRequest request,
+                         @RequestParam @NotBlank String key)
+            throws UnAuthException {
+
+        HashMap<String, Object> user = getClaims(request);
+
+        List<Target> targets = (List<Target>) user.get("targets");
+        JSONArray jsonArray = new JSONArray();
+
+        for (Target t : targets) {
+
+            if (!t.getTargetName().contains(key))
+                continue;
+
+            JSONObject jsonObject = new JSONObject()
+                    .put("receiverName", t.getTargetName())
+                    .put("receiverId", t.getTargetId())
+                    .put("mode", t.getChatMode().toString())
+                    .put("pic", t.getPicUrl())
+                    .put("newMsgs", 0);
+
+            jsonArray.put(jsonObject);
+        }
+
+        return Utility.generateSuccessMsg(
+                new PairValue("chats", jsonArray)
         );
     }
 
@@ -693,6 +778,7 @@ public class ChatController extends Router {
         boolean amIStarter = false;
         long lastSeenTarget = -1;
         List<Document> persons = null;
+        String senderIdStr = senderId.toString();
 
         if (chatRoom.getString("mode").equalsIgnoreCase("peer")) {
 
@@ -720,6 +806,7 @@ public class ChatController extends Router {
                 return;
 
             doc.put("seen", doc.getInteger("seen") + 1);
+            senderIdStr = chatRoom.getObjectId("receiver_id").toString();
         }
 
         ObjectId newChatId = new ObjectId();
@@ -729,9 +816,7 @@ public class ChatController extends Router {
         Document chat = new Document("content", content)
                 .append("created_at", curr)
                 .append("sender", senderId)
-                .append("_id", newChatId)
-//                            .append("status", ChatMessage.MessageStatus.RECEIVED.toString())
-                ;
+                .append("_id", newChatId);
 
         chats.add(chat);
 
@@ -740,7 +825,7 @@ public class ChatController extends Router {
                 newChatId.toString(),
                 curr,
                 chatRoom.getObjectId("_id").toString(),
-                senderId.toString(),
+                senderIdStr,
                 user_name
         );
 
@@ -759,14 +844,13 @@ public class ChatController extends Router {
                 );
 
                 if (chatPresenceTmp != null &&
-                        curr - chatPresenceTmp.getLong("last_seen") < HEART_BEAT + 3000) {
+                        curr - chatPresenceTmp.getLong("last_seen") < HEART_BEAT) {
 
                     String postfix = amIStarter ? chatRoom.getObjectId("receiver_id").toString() :
                             chatRoom.getObjectId("sender_id").toString();
 
                     sendChatPresenceMsg(postfix,
                             user_name,
-                            senderId.toString(),
                             amIStarter ? chatRoom.getInteger("new_msgs_rev") :
                                     chatRoom.getInteger("new_msgs"),
                             "peer",
@@ -790,15 +874,13 @@ public class ChatController extends Router {
                     );
 
                     if (chatPresenceTmp != null &&
-                            curr - chatPresenceTmp.getLong("last_seen") < HEART_BEAT + 3000) {
+                            curr - chatPresenceTmp.getLong("last_seen") < HEART_BEAT) {
 
                         String postfix = doc.getObjectId("user_id").toString();
 
                         sendChatPresenceMsg(postfix,
-                                "",
-                                chatRoom.getObjectId("receiver_id").toString(),
+                                senderIdStr,
                                 chatRoom.getInteger("new_msgs") - doc.getInteger("seen"),
-                                "group",
                                 chatMessage
                         );
                     }
@@ -820,7 +902,6 @@ public class ChatController extends Router {
     // send notif if user in online but not in wanted chat
     private void sendChatPresenceMsg(String postfix,
                                      String senderName,
-                                     String sender,
                                      int newMsgs,
                                      String mode,
                                      ChatMessage chatMessage) {
@@ -829,9 +910,28 @@ public class ChatController extends Router {
                 "/chat/" + postfix,
                 new ChatNotification(
                         senderName,
-                        sender,
                         newMsgs,
                         mode,
+                        chatMessage
+                )
+        );
+
+    }
+
+    // send notif if user in online but not in wanted chat
+    private void sendChatPresenceMsg(String postfix,
+                                     String senderId,
+                                     int newMsgs,
+                                     ChatMessage chatMessage) {
+
+        System.out.println(senderId);
+        messagingTemplate.convertAndSend(
+                "/chat/" + postfix,
+                new ChatNotification(
+                        "",
+                        senderId,
+                        newMsgs,
+                        ChatMode.GROUP.getName(),
                         chatMessage
                 )
         );

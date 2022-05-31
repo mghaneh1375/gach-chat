@@ -91,7 +91,7 @@ public class JwtTokenProvider {
         return Base64.getEncoder().encodeToString(isForSocket ? secretSocketKey.getBytes() : secretKey.getBytes());
     }
 
-    public String createToken(Document user) {
+    public PairValue createToken(Document user) {
 
         ObjectId userId = user.getObjectId("_id");
         Token oldToken = null;
@@ -100,7 +100,9 @@ public class JwtTokenProvider {
         if (cachedTokens.containsKey(userId)) {
 
             if (curr + SOCKET_TOKEN_CAUTION_TIME < cachedTokens.get(userId).getExpiredAt())
-                return cachedTokens.get(userId).getToken();
+                return new PairValue(cachedTokens.get(userId).getToken(),
+                    cachedTokens.get(userId).getExpiredAt() - curr
+                );
 
             if (curr - cachedTokens.get(userId).getExpiredAt() < 2 * SOCKET_TOKEN_EXPIRATION_MSEC)
                 oldToken = cachedTokens.get(userId);
@@ -168,7 +170,7 @@ public class JwtTokenProvider {
             cachedTokens.put(user.getObjectId("_id"), oldToken);
 
         validatedTokens.put(oldToken.getToken(), expireTime);
-        return oldToken.getToken();
+        return new PairValue(oldToken.getToken(), expireTime - curr);
     }
 
     private List<Target> fetchTargetsList(ObjectId userId,
