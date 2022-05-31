@@ -10,12 +10,9 @@ import java.util.List;
 import static com.example.websocketdemo.utility.Statics.STATICS_SERVER;
 
 public class Target {
+    
     public ObjectId getClassId() {
         return classId;
-    }
-
-    public String getTargetPic() {
-        return targetPic;
     }
 
     private final ChatMode chatMode;

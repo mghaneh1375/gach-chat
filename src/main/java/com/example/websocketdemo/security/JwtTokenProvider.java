@@ -213,7 +213,7 @@ public class JwtTokenProvider {
 
                     targets.add(new Target(studentId,
                             userDoc.getString("name_fa") + " " + userDoc.getString("last_name_fa"),
-                            STATICS_SERVER + UserRepository.FOLDER + "/" + userDoc.getString("pic"),
+                            userDoc.getString("pic"),
                             classId)
                     );
                 }
@@ -382,7 +382,7 @@ public class JwtTokenProvider {
             PairValue p = new PairValue(
                     theClass.getObjectId("_id"),
                     teacher.getString("name_fa") + " " + teacher.getString("last_name_fa") +
-                            "&&&&" + STATICS_SERVER + UserRepository.FOLDER + "/" + teacher.getString("pic")
+                            "&&&&" + teacher.getString("pic")
             );
 
             if (classAndTeacherIds.contains(p))
