@@ -64,7 +64,7 @@ public class RateLimiter implements Filter {
                 return true;
             }
         } catch (ExecutionException e) {
-            requests = 0;
+            return true;
         }
 
         if(requests == 0) {
@@ -74,7 +74,7 @@ public class RateLimiter implements Filter {
 
                         @Override
                         public void run() {
-                            socketRequestCountsPerIpAddress.put(clientIpAddress, 0);
+                            requestCountsPerIpAddress.put(clientIpAddress, 0);
                         }
                     }, 60000
             );
