@@ -49,31 +49,60 @@ public class ChatController extends Router {
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
+//    @PostMapping(value = "/api/getToken")
+//    @ResponseBody
+//    public String getToken(HttpServletRequest request,
+//                           @RequestBody @StrongJSONConstraint(
+//                                   params = {"captcha"},
+//                                   paramsType = {String.class}
+//                           ) @NotBlank String jsonStr
+//    ) throws UnAuthException, NotActivateAccountException {
+//
+//        Document user = getUserWithOutCheckCompleteness(request);
+//        JSONObject jsonObject = new JSONObject(jsonStr);
+//        String captcha = jsonObject.getString("captcha");
+//
+//        if (!DEV_MODE) {
+//
+//            if (captcha.isEmpty())
+//                return JSON_NOT_ACCESS;
+//
+//            try {
+//                new ReCaptcharV3Handler().verify(captcha);
+//            } catch (Exception x) {
+//                return JSON_NOT_ACCESS;
+//            }
+//
+//        }
+//
+//        try {
+//            PairValue p = jwtTokenProvider.createToken(user);
+//            String token = (String) p.getKey();
+//
+//            return Utility.generateSuccessMsg(
+//                    new PairValue("token", token),
+//                    new PairValue("reminder", p.getValue()),
+//                    new PairValue("heartBeatInterval", HEART_BEAT),
+//                    new PairValue("validityDuration", SOCKET_TOKEN_EXPIRATION_MSEC)
+//            );
+//        } catch (Exception x) {
+//            return Utility.generateErr(x.getMessage());
+//        }
+//    }
+
+
     @PostMapping(value = "/api/getToken")
     @ResponseBody
     public String getToken(HttpServletRequest request,
                            @RequestBody @StrongJSONConstraint(
-                                   params = {"captcha"},
-                                   paramsType = {String.class}
+                                   params = {},
+                                   paramsType = {},
+                                   optionals = {"captcha"},
+                                   optionalsType = {String.class}
                            ) @NotBlank String jsonStr
     ) throws UnAuthException, NotActivateAccountException {
 
         Document user = getUserWithOutCheckCompleteness(request);
-        JSONObject jsonObject = new JSONObject(jsonStr);
-        String captcha = jsonObject.getString("captcha");
-
-        if (!DEV_MODE) {
-
-            if (captcha.isEmpty())
-                return JSON_NOT_ACCESS;
-
-            try {
-                new ReCaptcharV3Handler().verify(captcha);
-            } catch (Exception x) {
-                return JSON_NOT_ACCESS;
-            }
-
-        }
 
         try {
             PairValue p = jwtTokenProvider.createToken(user);
