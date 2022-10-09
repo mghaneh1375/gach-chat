@@ -14,11 +14,12 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import static com.example.websocketdemo.WebsocketDemoApplication.SOCKET_MAX_REQUESTS_PER_MIN;
+import static com.example.websocketdemo.WebsocketDemoApplication.socketRequestCountsPerIpAddress;
 
 @Component
 public class RateLimiter implements Filter {
 
-    private static final int MAX_REQUESTS_PER_SECOND = SOCKET_MAX_REQUESTS_PER_MIN; //or whatever you want it to be
+    private static final int MAX_REQUESTS_PER_SECOND = 200; //or whatever you want it to be
     private LoadingCache<String, Integer> requestCountsPerIpAddress;
 
     public RateLimiter(){
@@ -50,18 +51,33 @@ public class RateLimiter implements Filter {
         filterChain.doFilter(servletRequest, servletResponse);
     }
 
-    private boolean isMaximumRequestsPerSecondExceeded(String clientIpAddress){
+    private boolean isMaximumRequestsPerSecondExceeded(final String clientIpAddress){
 
         int requests;
         try {
             requests = requestCountsPerIpAddress.get(clientIpAddress);
+
+            System.out.println("rate limiter: " + clientIpAddress + "  :  " + requests);
 
             if(requests > MAX_REQUESTS_PER_SECOND){
                 requestCountsPerIpAddress.put(clientIpAddress, requests);
                 return true;
             }
         } catch (ExecutionException e) {
-            requests = 0;
+            return true;
+        }
+
+        if(requests == 0) {
+
+            new java.util.Timer().schedule(
+                    new java.util.TimerTask() {
+
+                        @Override
+                        public void run() {
+                            requestCountsPerIpAddress.put(clientIpAddress, 0);
+                        }
+                    }, 60000
+            );
         }
 
         requests++;
