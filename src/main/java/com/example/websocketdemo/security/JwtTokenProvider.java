@@ -370,8 +370,8 @@ public class JwtTokenProvider {
             if (theClass == null || !theClass.containsKey("teacher_id"))
                 continue;
 
-            if (theClass.getInteger("start") > today ||
-                    theClass.getInteger("end") < today
+            if (theClass.getInteger("start") >= today ||
+                    theClass.getInteger("end") <= today
             )
                 continue;
 
@@ -401,8 +401,8 @@ public class JwtTokenProvider {
 
         ArrayList<Document> docs = classRepository.find(and(
                 eq("teacher_id", teacherId),
-                lt("start", today),
-                gt("end", today)
+                lte("start", today),
+                gte("end", today)
         ), new BasicDBObject("_id", 1));
 
         ArrayList<Object> classes = new ArrayList<>();
