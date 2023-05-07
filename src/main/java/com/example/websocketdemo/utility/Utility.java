@@ -9,6 +9,8 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.regex.Pattern;
 
+import static com.example.websocketdemo.utility.Statics.ONE_DAY_MIL_SEC;
+
 
 public class Utility {
 
@@ -123,6 +125,13 @@ public class Utility {
             jsonObject.put(p.getKey().toString(), p.getValue());
 
         return jsonObject.toString();
+    }
+
+    public static int getPast(int days) {
+        Locale loc = new Locale("en_US");
+        SolarCalendar sc = new SolarCalendar(-ONE_DAY_MIL_SEC * days);
+        return Integer.parseInt(String.valueOf(sc.year) + String.format(loc, "%02d",
+                sc.month) + String.format(loc, "%02d", sc.date));
     }
 
     public static int getToday() {

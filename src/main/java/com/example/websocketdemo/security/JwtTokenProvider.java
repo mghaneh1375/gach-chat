@@ -354,7 +354,10 @@ public class JwtTokenProvider {
         List<Document> passed = user.getList("passed", Document.class);
         ArrayList<Object> classAndTeacherIds = new ArrayList<>();
         ArrayList<ObjectId> courseIds = new ArrayList<>();
-        int today = Utility.getToday();
+
+        int pastWeek = Utility.getPast(7);
+        int tomorrow = Utility.getPast(-1);
+
 
         for (Document itr : passed) {
 
@@ -370,8 +373,8 @@ public class JwtTokenProvider {
             if (theClass == null || !theClass.containsKey("teacher_id"))
                 continue;
 
-            if (theClass.getInteger("start") >= today ||
-                    theClass.getInteger("end") <= today
+            if (theClass.getInteger("start") > tomorrow ||
+                    theClass.getInteger("end") < pastWeek
             )
                 continue;
 
@@ -397,12 +400,14 @@ public class JwtTokenProvider {
 
     private ArrayList<Object> getCurrentClassIds(ObjectId teacherId) {
 
-        int today = Utility.getToday();
+        int pastWeek = Utility.getPast(7);
+        int tomorrow = Utility.getPast(-1);
+
 
         ArrayList<Document> docs = classRepository.find(and(
                 eq("teacher_id", teacherId),
-                lte("start", today),
-                gte("end", today)
+                lte("start", tomorrow),
+                gte("end", pastWeek)
         ), new BasicDBObject("_id", 1));
 
         ArrayList<Object> classes = new ArrayList<>();
