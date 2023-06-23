@@ -7,7 +7,6 @@ public class ChatNotification {
     private String type;
     private String senderName;
     private String senderId;
-    private String mode;
     private ChatMessage chatMessage;
 
     public String getSenderId() {
@@ -26,34 +25,23 @@ public class ChatNotification {
         this.senderName = senderName;
     }
 
-    public String getMode() {
-        return mode;
-    }
-
-    public void setMode(String mode) {
-        this.mode = mode;
-    }
-
-    public ChatNotification(String senderName, int count, String mode,
-                            ChatMessage chatMessage) {
+    public ChatNotification(String senderName, int count, ChatMessage chatMessage) {
         this.senderName = senderName;
         this.chatId = chatMessage.getChatId();
         this.count = count;
         this.type = "NOTIF";
-        this.mode = mode;
         this.chatMessage = chatMessage;
         this.senderId = chatMessage.getSenderId();
     }
 
-    public ChatNotification(String senderName, String senderId, int count,
-                            String mode, ChatMessage chatMessage) {
+    public ChatNotification(String senderName, String senderId,
+                            int count, ChatMessage chatMessage) {
         System.out.println(senderId);
         this.senderName = senderName;
         this.chatId = chatMessage.getChatId();
         this.senderId = senderId;
         this.count = count;
         this.type = "NOTIF";
-        this.mode = mode;
         this.chatMessage = chatMessage;
     }
 

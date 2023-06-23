@@ -34,7 +34,7 @@ public class Router {
                 throw new NotActivateAccountException("Account not activated");
             }
 
-            if (!Authorization.isAdmin(u.getString("access")))
+            if (!Authorization.isAdmin(u.getList("accesses", String.class)))
                 throw new NotAccessException("Access denied");
 
             return true;
@@ -115,7 +115,7 @@ public class Router {
             }
 
             if (targetId != null && Target.searchInTargets(
-                    (List<Target>) user.get("targets"), null, new ObjectId(targetId)
+                    (List<Target>) user.get("targets"), new ObjectId(targetId)
             ) != null)
                 throw new AuthenticationCredentialsNotFoundException("Has no access");
 

@@ -2,12 +2,9 @@ package com.example.websocketdemo.security;
 
 import com.example.websocketdemo.db.UserRepository;
 import com.example.websocketdemo.exception.CustomException;
-import com.example.websocketdemo.model.ChatMode;
 import com.example.websocketdemo.model.Target;
 import com.example.websocketdemo.utility.Authorization;
 import com.example.websocketdemo.utility.PairValue;
-import com.example.websocketdemo.utility.Utility;
-import com.mongodb.BasicDBObject;
 import io.jsonwebtoken.*;
 import org.bson.Document;
 import org.bson.types.ObjectId;
@@ -21,10 +18,8 @@ import org.springframework.stereotype.Component;
 import javax.servlet.http.HttpServletRequest;
 import java.util.*;
 
-import static com.example.websocketdemo.WebsocketDemoApplication.classRepository;
 import static com.example.websocketdemo.WebsocketDemoApplication.userRepository;
 import static com.example.websocketdemo.utility.Statics.*;
-import static com.mongodb.client.model.Filters.*;
 
 @Component
 public class JwtTokenProvider {
@@ -138,9 +133,8 @@ public class JwtTokenProvider {
             oldToken = new Token();
 
         if (reFillTargets) {
-//            String s = ZipUtils.compress(Target.toJSONArray(targets).toString());
             oldToken.setTargets(fetchTargetsList(userId,
-                    Authorization.isTeacher(user.getString("access")),
+                    Authorization.isAdvisor(user.getList("accesses", String.class)),
                     user)
             );
         }
@@ -148,7 +142,7 @@ public class JwtTokenProvider {
         claims.put("reuse", reuse);
         claims.put("name", user.getString("name_fa") + " " + user.getString("last_name_fa"));
         claims.put("pic", STATICS_SERVER + UserRepository.FOLDER + "/" + user.getString("pic"));
-        claims.put("access", user.getString("access"));
+        claims.put("accesses", user.getList("accesses", String.class));
         claims.put("digest", user.getObjectId("_id").toString() + "_" +
                 user.getString("username") + "_" + user.getString("access"));
 
@@ -178,66 +172,35 @@ public class JwtTokenProvider {
                                           Document user) {
 
         List<Target> targets = new ArrayList<>();
-        ArrayList<Object> currentClassAndTeachers;
 
-        if (isTeacher)
-            currentClassAndTeachers = getCurrentClassIds(userId);
-        else {
-
-            if (user == null)
-                user = userRepository.findById(userId);
-
-            currentClassAndTeachers = getCurrentClassAndTeacherIds(user);
-        }
+        if (user == null)
+            user = userRepository.findById(userId);
 
         if (isTeacher) {
 
-            for (Object o : currentClassAndTeachers) {
+            List<Document> students = user.getList("students", Document.class);
 
-                ObjectId classId = (ObjectId) o;
-                Document theClass = classRepository.findById(classId);
+            for (Document student : students) {
 
-                if (theClass == null)
+                ObjectId studentId = student.getObjectId("_id");
+                Document userDoc = userRepository.findById(studentId);
+
+                if (userDoc == null)
                     continue;
 
-                targets.add(new Target(ChatMode.GROUP, classId, theClass.getString("name")));
-
-                List<Document> students = theClass.getList("students", Document.class);
-                for (Document student : students) {
-
-                    ObjectId studentId = student.getObjectId("_id");
-                    Document userDoc = userRepository.findById(studentId);
-
-                    if (userDoc == null)
-                        continue;
-
-                    targets.add(new Target(studentId,
-                            userDoc.getString("name_fa") + " " + userDoc.getString("last_name_fa"),
-                            userDoc.getString("pic"),
-                            classId)
-                    );
-                }
+                targets.add(new Target(studentId,
+                        userDoc.getString("name_fa") + " " + userDoc.getString("last_name_fa"),
+                        userDoc.getString("pic"))
+                );
             }
         } else {
 
-            for (Object o : currentClassAndTeachers) {
+            Document userDoc = userRepository.findById(user.getObjectId("advisor_id"));
 
-                PairValue p = (PairValue) o;
-                ObjectId classId = (ObjectId) p.getKey();
-                Document theClass = classRepository.findById(classId);
-
-                if (theClass == null)
-                    continue;
-
-                targets.add(new Target(ChatMode.GROUP, classId, theClass.getString("name")));
-                String[] splited = ((String) p.getValue()).split("&&&&");
-
-                targets.add(new Target(
-                                theClass.getObjectId("teacher_id"),
-                                splited[0], splited[1], classId
-                        )
-                );
-            }
+            targets.add(new Target(user.getObjectId("advisor_id"),
+                    userDoc.getString("name_fa") + " " + userDoc.getString("last_name_fa"),
+                    userDoc.getString("pic"))
+            );
 
         }
 
@@ -265,14 +228,13 @@ public class JwtTokenProvider {
         output.put("name", claims.get("name"));
         output.put("pic", claims.get("pic"));
         output.put("username", claims.getSubject());
-//        output.put("targets", ZipUtils.extract(claims.get("targets").toString()));
 
         if (cachedTokens.containsKey(userId))
             output.put("targets", cachedTokens.get(userId).getTargets());
         else {
 
             List<Target> targets = fetchTargetsList(userId,
-                    Authorization.isTeacher(claims.get("access").toString()),
+                    Authorization.isAdvisor((List<String>)claims.get("accesses")),
                     null
             );
 
@@ -285,7 +247,7 @@ public class JwtTokenProvider {
             output.put("targets", targets);
         }
 
-        output.put("access", claims.get("access"));
+        output.put("accesses", claims.get("accesses"));
         return output;
     }
 
@@ -347,74 +309,6 @@ public class JwtTokenProvider {
             throw new CustomException("Expired or invalid JWT token", HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
-    }
-
-    private ArrayList<Object> getCurrentClassAndTeacherIds(Document user) {
-
-        List<Document> passed = user.getList("passed", Document.class);
-        ArrayList<Object> classAndTeacherIds = new ArrayList<>();
-        ArrayList<ObjectId> courseIds = new ArrayList<>();
-
-        int pastWeek = Utility.getPast(7);
-        int tomorrow = Utility.getPast(-1);
-
-
-        for (Document itr : passed) {
-
-            if (!itr.containsKey("class_id") ||
-                    itr.containsKey("success") ||
-                    itr.containsKey("final_result") ||
-                    courseIds.contains(itr.getObjectId("course_id"))
-            )
-                continue;
-
-            Document theClass = classRepository.findById(itr.getObjectId("class_id"));
-
-            if (theClass == null || !theClass.containsKey("teacher_id"))
-                continue;
-
-            if (theClass.getInteger("start") > tomorrow ||
-                    theClass.getInteger("end") < pastWeek
-            )
-                continue;
-
-            Document teacher = userRepository.findById(theClass.getObjectId("teacher_id"));
-            if (teacher == null)
-                continue;
-
-            PairValue p = new PairValue(
-                    theClass.getObjectId("_id"),
-                    teacher.getString("name_fa") + " " + teacher.getString("last_name_fa") +
-                            "&&&&" + teacher.getString("pic")
-            );
-
-            if (classAndTeacherIds.contains(p))
-                continue;
-
-            courseIds.add(itr.getObjectId("course_id"));
-            classAndTeacherIds.add(p);
-        }
-
-        return classAndTeacherIds;
-    }
-
-    private ArrayList<Object> getCurrentClassIds(ObjectId teacherId) {
-
-        int pastWeek = Utility.getPast(7);
-        int tomorrow = Utility.getPast(-1);
-
-
-        ArrayList<Document> docs = classRepository.find(and(
-                eq("teacher_id", teacherId),
-                lte("start", tomorrow),
-                gte("end", pastWeek)
-        ), new BasicDBObject("_id", 1));
-
-        ArrayList<Object> classes = new ArrayList<>();
-        for (Document doc : docs)
-            classes.add(doc.getObjectId("_id"));
-
-        return classes;
     }
 
 }

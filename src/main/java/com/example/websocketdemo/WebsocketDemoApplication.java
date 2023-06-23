@@ -2,7 +2,6 @@ package com.example.websocketdemo;
 
 import com.example.websocketdemo.db.ChatPresenceRepository;
 import com.example.websocketdemo.db.ChatRoomRepository;
-import com.example.websocketdemo.db.ClassRepository;
 import com.example.websocketdemo.db.UserRepository;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -21,11 +20,10 @@ import java.util.concurrent.TimeUnit;
 public class WebsocketDemoApplication {
 
 	final static private ConnectionString connString = new ConnectionString(
-			"mongodb://localhost:27017/austria"
+			"mongodb://localhost:27017/gachesefid"
 	);
 	public static MongoDatabase mongoDatabase;
 	public static UserRepository userRepository;
-	public static ClassRepository classRepository;
 	public static ChatRoomRepository chatRoomRepository;
 	public static ChatPresenceRepository chatPresenceRepository;
 
@@ -41,10 +39,9 @@ public class WebsocketDemoApplication {
 					.build();
 
 			MongoClient mongoClient = MongoClients.create(settings);
-			mongoDatabase = mongoClient.getDatabase("austria");
+			mongoDatabase = mongoClient.getDatabase("gachesefid");
 
 			userRepository = new UserRepository();
-			classRepository = new ClassRepository();
 			chatRoomRepository = new ChatRoomRepository();
 			chatPresenceRepository = new ChatPresenceRepository();
 

@@ -11,32 +11,21 @@ import static com.example.websocketdemo.utility.Statics.STATICS_SERVER;
 
 public class Target {
 
-    public ObjectId getClassId() {
-        return classId;
-    }
-
-    private final ChatMode chatMode;
     private final ObjectId targetId;
     private final String targetName;
-    private final ObjectId classId;
     private final String targetPic;
 
-    public Target(ChatMode chatMode, ObjectId targetId, String targetName) {
-        this.chatMode = chatMode;
+    public Target(ObjectId targetId, String targetName) {
         this.targetId = targetId;
         this.targetName = targetName;
-        classId = null;
         targetPic = "";
     }
 
     public Target(ObjectId targetId,
                   String targetName,
-                  String targetPic,
-                  ObjectId classId) {
-        this.chatMode = ChatMode.PEER;
+                  String targetPic) {
         this.targetId = targetId;
         this.targetName = targetName;
-        this.classId = classId;
         this.targetPic = targetPic;
     }
 
@@ -50,24 +39,16 @@ public class Target {
         return jsonArray;
     }
 
-    public static Target searchInTargets(List<Target> targets, ChatMode chatMode, ObjectId id) {
+    public static Target searchInTargets(List<Target> targets, ObjectId id) {
 
         for (Target target : targets) {
 
-            if (
-                    ((target.getChatMode().equals(chatMode)) ||
-                            chatMode == null
-                    ) && target.getTargetId().equals(id)
-            )
+            if (target.getTargetId().equals(id))
                 return target;
 
         }
 
         return null;
-    }
-
-    public ChatMode getChatMode() {
-        return chatMode;
     }
 
     public ObjectId getTargetId() {
@@ -81,12 +62,8 @@ public class Target {
     public JSONObject toJSONObject() {
 
         JSONObject jsonObject = new JSONObject()
-//                .put("mode", chatMode.name())
                 .put("name", targetName)
                 .put("id", targetId);
-
-//        if(classId != null)
-//            jsonObject.put("classId", classId);
 
         jsonObject.put("targetPic", getPicUrl());
         return jsonObject;

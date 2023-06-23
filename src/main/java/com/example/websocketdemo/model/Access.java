@@ -1,8 +1,7 @@
 package com.example.websocketdemo.model;
-
 public enum Access {
 
-    LIBRARY, SUPERADMIN, TEACHER, ADMIN, STUDENT, ACCOUNTANT, EDUCATIONAL_MANAGER;
+    ADVISOR, SUPERADMIN, TEACHER, ADMIN, STUDENT, AGENT, SCHOOL;
 
     public String getName() {
         return name().toLowerCase();

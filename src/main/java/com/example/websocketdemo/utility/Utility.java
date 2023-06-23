@@ -31,6 +31,19 @@ public class Utility {
         return null;
     }
 
+    public static int searchInDocumentsKeyValIdx(List<Document> arr, String key, Object val) {
+
+        if (arr == null)
+            return -1;
+
+        for (int i = 0; i < arr.size(); i++) {
+            if (arr.get(i).containsKey(key) && arr.get(i).get(key).equals(val))
+                return i;
+        }
+
+        return -1;
+    }
+
     public static String convertIntToTime(int time) {
         String timeStr = (time < 1000) ? "0" + time : time + "";
         return timeStr.substring(0, 2) + ":" + timeStr.substring(2);

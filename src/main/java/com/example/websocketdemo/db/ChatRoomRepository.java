@@ -1,7 +1,6 @@
 package com.example.websocketdemo.db;
 
 import com.example.websocketdemo.WebsocketDemoApplication;
-import com.example.websocketdemo.model.ChatMode;
 import com.example.websocketdemo.model.Target;
 import com.mongodb.BasicDBObject;
 import org.bson.Document;
@@ -39,80 +38,63 @@ public class ChatRoomRepository extends Common {
 
             Bson filter;
 
-            if (target.getChatMode().equals(ChatMode.PEER)) {
 
-                if (isTeacher) {
+            if (isTeacher) {
 
-                    //todo : consider old msgs and don't return them
+                //todo : consider old msgs and don't return them
 
-                    filter = and(
-                            eq("mode", "peer"),
-                            eq("sender_id", userId)
+                filter = and(
+                        eq("sender_id", userId)
+                );
+
+                if (!constraintsBson.contains(filter)) {
+                    constraintsBson.add(filter);
+                    constraints.add(new Document("mode", "peer")
+                            .append("sender_id", userId));
+                }
+
+                filter = and(
+                        eq("mode", "peer"),
+                        eq("receiver_id", userId)
+                );
+
+                if (!constraintsBson.contains(filter)) {
+                    constraintsBson.add(filter);
+                    constraints.add(new Document("mode", "peer")
+                            .append("receiver_id", userId)
                     );
-
-                    if (!constraintsBson.contains(filter)) {
-                        constraintsBson.add(filter);
-                        constraints.add(new Document("mode", "peer")
-                                .append("sender_id", userId));
-                    }
-
-                    filter = and(
-                            eq("mode", "peer"),
-                            eq("receiver_id", userId)
-                    );
-
-                    if (!constraintsBson.contains(filter)) {
-                        constraintsBson.add(filter);
-                        constraints.add(new Document("mode", "peer")
-                                .append("receiver_id", userId)
-                        );
-                    }
-
-                } else {
-                    filter = and(
-                            eq("mode", "peer"),
-                            eq("sender_id", userId),
-                            eq("receiver_id", target.getTargetId())
-                    );
-
-                    if (!constraintsBson.contains(filter)) {
-                        constraintsBson.add(filter);
-                        constraints.add(new Document("mode", "peer")
-                                .append("sender_id", userId)
-                                .append("receiver_id", target.getTargetId())
-                        );
-                    }
-
-                    filter = and(
-                            eq("mode", "peer"),
-                            eq("receiver_id", userId),
-                            eq("sender_id", target.getTargetId())
-                    );
-
-                    if (!constraintsBson.contains(filter)) {
-                        constraintsBson.add(filter);
-                        constraints.add(new Document("mode", "peer")
-                                .append("receiver_id", userId)
-                                .append("sender_id", target.getTargetId())
-                        );
-                    }
                 }
 
             } else {
-
                 filter = and(
-                        eq("mode", "group"),
+                        eq("mode", "peer"),
+                        eq("sender_id", userId),
                         eq("receiver_id", target.getTargetId())
                 );
 
                 if (!constraintsBson.contains(filter)) {
                     constraintsBson.add(filter);
-                    constraints.add(new Document("mode", "group")
+                    constraints.add(new Document("mode", "peer")
+                            .append("sender_id", userId)
                             .append("receiver_id", target.getTargetId())
                     );
                 }
 
+                filter = and(
+                        eq("mode", "peer"),
+                        eq("receiver_id", userId),
+                        eq("sender_id", target.getTargetId())
+                );
+
+                if (!constraintsBson.contains(filter)) {
+                    constraintsBson.add(filter);
+                    constraints.add(new Document("mode", "peer")
+                            .append("receiver_id", userId)
+                            .append("sender_id", target.getTargetId())
+                    );
+                }
             }
+
         }
 
         ArrayList<Document> output = getWholeCache(constraints);
@@ -128,8 +110,8 @@ public class ChatRoomRepository extends Common {
         }
 
         ArrayList<Document> docs = chatRoomRepository.find(and(
-                nin("_id", excludes),
-                or(constraintsBson)
+                        nin("_id", excludes),
+                        or(constraintsBson)
                 ), new BasicDBObject("sender_id", 1).append("receiver_id", 1)
                         .append("new_msgs", 1).append("new_msgs_rev", 1)
                         .append("mode", 1).append("persons", 1)
