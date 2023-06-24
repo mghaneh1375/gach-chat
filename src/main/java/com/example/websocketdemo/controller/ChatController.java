@@ -53,6 +53,7 @@ public class ChatController extends Router {
     public String getToken(HttpServletRequest request) throws UnAuthException, NotActivateAccountException {
 
         Document user = getUserWithOutCheckCompleteness(request);
+        System.out.println(user);
 
         try {
             PairValue p = jwtTokenProvider.createToken(user);

@@ -33,7 +33,7 @@ public class UserAPIRoutes extends Router {
 
         return Utility.generateSuccessMsg(
                 new PairValue("id", user.getObjectId("_id").toString()),
-                new PairValue("name", user.getString("name_fa") + " " + user.getString("last_name_fa"))
+                new PairValue("name", user.getString("first_name") + " " + user.getString("last_name"))
         );
 
     }

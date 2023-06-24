@@ -153,4 +153,13 @@ public class Utility {
         return Integer.parseInt(String.valueOf(sc.year) + String.format(loc, "%02d",
                 sc.month) + String.format(loc, "%02d", sc.date));
     }
+
+    public static void printException(Exception x) {
+
+        System.out.println(x.getMessage());
+        int limit = x.getStackTrace().length > 5 ? 5 : x.getStackTrace().length;
+        for (int i = 0; i < limit; i++)
+            System.out.println(x.getStackTrace()[i]);
+
+    }
 }

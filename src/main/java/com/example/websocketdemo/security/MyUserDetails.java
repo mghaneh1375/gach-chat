@@ -8,7 +8,6 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
-import java.util.Objects;
 
 import static com.example.websocketdemo.WebsocketDemoApplication.userRepository;
 
@@ -21,34 +20,26 @@ public class MyUserDetails implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
 
+        System.out.println("username is " + username);
         Document user = cached.get(username);
+
+        System.out.println("cached user is " + user);
 
         if(user == null) {
             user = userRepository.findByUsername(username);
+
+            System.out.println("fetched user is " + user);
+
             if (user == null)
                 throw new UsernameNotFoundException("User '" + username + "' not found");
             else
                 cached.put(username, user);
         }
 
-        boolean level = Objects.requireNonNull(userRepository.findByUsername(username)).getBoolean("level");
-
-        if (level) {
-            return org.springframework.security.core.userdetails.User
-                    .withUsername(username)
-                    .password(user.getString("password"))
-                    .authorities(Role.ROLE_ADMIN)
-                    .accountExpired(false)
-                    .accountLocked(false)
-                    .credentialsExpired(false)
-                    .disabled(false)
-                    .build();
-        }
-
         return org.springframework.security.core.userdetails.User
                 .withUsername(username)
-                .password(user.getString("password"))
                 .authorities(Role.ROLE_CLIENT)
+                .password(user.getString("password"))
                 .accountExpired(false)
                 .accountLocked(false)
                 .credentialsExpired(false)

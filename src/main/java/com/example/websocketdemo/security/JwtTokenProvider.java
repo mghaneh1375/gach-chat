@@ -86,6 +86,15 @@ public class JwtTokenProvider {
         return Base64.getEncoder().encodeToString(isForSocket ? secretSocketKey.getBytes() : secretKey.getBytes());
     }
 
+    private String getStringRole(List<String> accesses) {
+
+        boolean isAdmin = Authorization.isAdmin(accesses);
+        boolean isAdvisor = Authorization.isAdvisor(accesses);
+
+        return isAdmin ? "admin" : isAdvisor ? "advisor" : "student";
+
+    }
+
     public PairValue createToken(Document user) {
 
         ObjectId userId = user.getObjectId("_id");
@@ -96,14 +105,23 @@ public class JwtTokenProvider {
 
             if (curr + SOCKET_TOKEN_CAUTION_TIME < cachedTokens.get(userId).getExpiredAt())
                 return new PairValue(cachedTokens.get(userId).getToken(),
-                    cachedTokens.get(userId).getExpiredAt() - curr
+                        cachedTokens.get(userId).getExpiredAt() - curr
                 );
 
             if (curr - cachedTokens.get(userId).getExpiredAt() < 2 * SOCKET_TOKEN_EXPIRATION_MSEC)
                 oldToken = cachedTokens.get(userId);
         }
 
-        Claims claims = Jwts.claims().setSubject(user.getString("username"));
+        String username = user.containsKey("phone") ?
+                user.getString("phone") :
+                user.getString("mail");
+
+        System.out.println("Creating token");
+        System.out.println(username);
+        System.out.println(user);
+
+        Claims claims = Jwts.claims().setSubject(username);
+
         claims.put("user_id", userId.toString());
         int reuse = 0;
 
@@ -114,12 +132,11 @@ public class JwtTokenProvider {
             Claims e = null;
 
             try {
-                 e = Jwts.parser().setSigningKey(getSharedKeyBytes(true)).parseClaimsJws(oldToken.getToken()).getBody();
+                e = Jwts.parser().setSigningKey(getSharedKeyBytes(true)).parseClaimsJws(oldToken.getToken()).getBody();
             } catch (ExpiredJwtException ex) {
                 e = ex.getClaims();
-            }
-            finally {
-                if(e != null) {
+            } finally {
+                if (e != null) {
                     reuse = (int) e.get("reuse");
                     if (reuse >= TOKEN_REUSABLE)
                         reuse = 0;
@@ -139,12 +156,15 @@ public class JwtTokenProvider {
             );
         }
 
+        List<String> accesses = user.getList("accesses", String.class);
+        String myRole = getStringRole(accesses);
+
         claims.put("reuse", reuse);
-        claims.put("name", user.getString("name_fa") + " " + user.getString("last_name_fa"));
+        claims.put("name", user.getString("first_name") + " " + user.getString("last_name"));
         claims.put("pic", STATICS_SERVER + UserRepository.FOLDER + "/" + user.getString("pic"));
-        claims.put("accesses", user.getList("accesses", String.class));
+        claims.put("accesses", accesses);
         claims.put("digest", user.getObjectId("_id").toString() + "_" +
-                user.getString("username") + "_" + user.getString("access"));
+                username + "_" + myRole);
 
         Date now = new Date();
         long expireTime = now.getTime() + SOCKET_TOKEN_EXPIRATION_MSEC;
@@ -168,7 +188,7 @@ public class JwtTokenProvider {
     }
 
     private List<Target> fetchTargetsList(ObjectId userId,
-                                          boolean isTeacher,
+                                          boolean isAdvisor,
                                           Document user) {
 
         List<Target> targets = new ArrayList<>();
@@ -176,7 +196,7 @@ public class JwtTokenProvider {
         if (user == null)
             user = userRepository.findById(userId);
 
-        if (isTeacher) {
+        if (isAdvisor) {
 
             List<Document> students = user.getList("students", Document.class);
 
@@ -188,9 +208,11 @@ public class JwtTokenProvider {
                 if (userDoc == null)
                     continue;
 
-                targets.add(new Target(studentId,
-                        userDoc.getString("name_fa") + " " + userDoc.getString("last_name_fa"),
-                        userDoc.getString("pic"))
+                targets.add(
+                        new Target(
+                                studentId, userDoc.getString("first_name") + " " + userDoc.getString("last_name"),
+                                userDoc.getString("pic")
+                        )
                 );
             }
         } else {
@@ -198,7 +220,7 @@ public class JwtTokenProvider {
             Document userDoc = userRepository.findById(user.getObjectId("advisor_id"));
 
             targets.add(new Target(user.getObjectId("advisor_id"),
-                    userDoc.getString("name_fa") + " " + userDoc.getString("last_name_fa"),
+                    userDoc.getString("first_name") + " " + userDoc.getString("last_name"),
                     userDoc.getString("pic"))
             );
 
@@ -234,7 +256,7 @@ public class JwtTokenProvider {
         else {
 
             List<Target> targets = fetchTargetsList(userId,
-                    Authorization.isAdvisor((List<String>)claims.get("accesses")),
+                    Authorization.isAdvisor((List<String>) claims.get("accesses")),
                     null
             );
 
@@ -267,11 +289,17 @@ public class JwtTokenProvider {
         try {
             Jws<Claims> cliams = Jwts.parser().setSigningKey(getSharedKeyBytes(isForSocket)).parseClaimsJws(token);
 
-            if (isForSocket && !cliams.getBody().get("digest").equals(
-                    cliams.getBody().get("user_id") + "_" + cliams.getBody().getSubject() + "_" +
-                            cliams.getBody().get("access")
-            ))
-                return false;
+            if (isForSocket) {
+
+                List<String> accesses = (List<String>) cliams.getBody().get("accesses");
+                String myRole = getStringRole(accesses);
+
+                if (!cliams.getBody().get("digest").equals(
+                        cliams.getBody().get("user_id") + "_" + cliams.getBody().getSubject() + "_" +
+                                myRole
+                ))
+                    return false;
+            }
 
             validatedTokens.put(token, cliams.getBody().getExpiration().getTime());
             return true;
@@ -299,7 +327,7 @@ public class JwtTokenProvider {
 
             HashMap<String, String> out = new HashMap<>();
 
-            for(String str : cliams.getBody().keySet())
+            for (String str : cliams.getBody().keySet())
                 out.put(str, cliams.getBody().get(str).toString());
 
             return out;

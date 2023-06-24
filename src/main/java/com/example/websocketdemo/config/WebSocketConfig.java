@@ -46,7 +46,7 @@ public class WebSocketConfig extends WebSocketMessageBrokerConfigurationSupport 
                     .addInterceptors(
                             new IpHandshakeInterceptor()
                     )
-                    .setAllowedOrigins("https://okft.org")
+                    .setAllowedOrigins("https://e.irysc.com")
                     .withSockJS();
 
     }
