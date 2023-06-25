@@ -14,26 +14,15 @@ class Utility {
     static void hasAccess(ObjectId userId, String chatId
     ) throws AuthenticationException {
 
-        System.out.println(userId);
-        System.out.println(chatId);
-
         Document chatRoom = chatRoomRepository.findById(new ObjectId(chatId));
+        System.out.println("IN UTILITY");
 
         if (chatRoom == null)
             throw new AuthenticationCredentialsNotFoundException("Has no access");
 
-        if (chatRoom.getString("mode").equals("peer")) {
-
-            if (!chatRoom.getObjectId("sender_id").equals(userId) &&
-                    !chatRoom.getObjectId("receiver_id").equals(userId)
-            )
-                throw new AuthenticationCredentialsNotFoundException("Has no access");
-        }
-
-        List<Document> persons = chatRoom.getList("persons", Document.class);
-        Document doc = com.example.websocketdemo.utility.Utility.searchInDocumentsKeyVal(persons, "user_id", userId);
-
-        if (doc == null)
+        if (!chatRoom.getObjectId("sender_id").equals(userId) &&
+                !chatRoom.getObjectId("receiver_id").equals(userId)
+        )
             throw new AuthenticationCredentialsNotFoundException("Has no access");
 
     }

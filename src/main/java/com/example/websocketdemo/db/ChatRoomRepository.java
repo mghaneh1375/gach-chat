@@ -43,53 +43,41 @@ public class ChatRoomRepository extends Common {
 
                 //todo : consider old msgs and don't return them
 
-                filter = and(
-                        eq("sender_id", userId)
-                );
+                filter = eq("sender_id", userId);
 
                 if (!constraintsBson.contains(filter)) {
                     constraintsBson.add(filter);
-                    constraints.add(new Document("mode", "peer")
-                            .append("sender_id", userId));
+                    constraints.add(new Document("sender_id", userId));
                 }
 
-                filter = and(
-                        eq("mode", "peer"),
-                        eq("receiver_id", userId)
-                );
+                filter = eq("receiver_id", userId);
 
                 if (!constraintsBson.contains(filter)) {
                     constraintsBson.add(filter);
-                    constraints.add(new Document("mode", "peer")
-                            .append("receiver_id", userId)
-                    );
+                    constraints.add(new Document("receiver_id", userId));
                 }
 
             } else {
                 filter = and(
-                        eq("mode", "peer"),
                         eq("sender_id", userId),
                         eq("receiver_id", target.getTargetId())
                 );
 
                 if (!constraintsBson.contains(filter)) {
                     constraintsBson.add(filter);
-                    constraints.add(new Document("mode", "peer")
-                            .append("sender_id", userId)
+                    constraints.add(new Document("sender_id", userId)
                             .append("receiver_id", target.getTargetId())
                     );
                 }
 
                 filter = and(
-                        eq("mode", "peer"),
                         eq("receiver_id", userId),
                         eq("sender_id", target.getTargetId())
                 );
 
                 if (!constraintsBson.contains(filter)) {
                     constraintsBson.add(filter);
-                    constraints.add(new Document("mode", "peer")
-                            .append("receiver_id", userId)
+                    constraints.add(new Document("receiver_id", userId)
                             .append("sender_id", target.getTargetId())
                     );
                 }
@@ -114,7 +102,6 @@ public class ChatRoomRepository extends Common {
                         or(constraintsBson)
                 ), new BasicDBObject("sender_id", 1).append("receiver_id", 1)
                         .append("new_msgs", 1).append("new_msgs_rev", 1)
-                        .append("mode", 1).append("persons", 1)
         );
 
         for (Document doc : docs) {
@@ -132,18 +119,12 @@ public class ChatRoomRepository extends Common {
 
         ArrayList<Document> constraints = new ArrayList<>();
 
-        constraints.add(new Document("mode", "peer")
-                .append("sender_id", senderId)
+        constraints.add(new Document("sender_id", senderId)
                 .append("receiver_id", receiverId)
         );
 
-        constraints.add(new Document("mode", "peer")
-                .append("receiver_id", senderId)
+        constraints.add(new Document("receiver_id", senderId)
                 .append("sender_id", receiverId)
-        );
-
-        constraints.add(new Document("mode", "group")
-                .append("receiver_id", receiverId)
         );
 
         ArrayList<Document> docs = getWholeCache(constraints);
@@ -156,7 +137,6 @@ public class ChatRoomRepository extends Common {
 
         constraintsBson.add(
                 and(
-                        eq("mode", "peer"),
                         eq("sender_id", senderId),
                         eq("receiver_id", receiverId)
                 )
@@ -164,14 +144,6 @@ public class ChatRoomRepository extends Common {
 
         constraintsBson.add(
                 and(
-                        eq("mode", "group"),
-                        eq("receiver_id", receiverId)
-                )
-        );
-
-        constraintsBson.add(
-                and(
-                        eq("mode", "peer"),
                         eq("receiver_id", senderId),
                         eq("sender_id", receiverId)
                 )

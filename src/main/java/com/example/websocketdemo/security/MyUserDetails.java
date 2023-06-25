@@ -20,15 +20,10 @@ public class MyUserDetails implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
 
-        System.out.println("username is " + username);
         Document user = cached.get(username);
-
-        System.out.println("cached user is " + user);
 
         if(user == null) {
             user = userRepository.findByUsername(username);
-
-            System.out.println("fetched user is " + user);
 
             if (user == null)
                 throw new UsernameNotFoundException("User '" + username + "' not found");

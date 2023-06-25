@@ -53,7 +53,6 @@ public class ChatController extends Router {
     public String getToken(HttpServletRequest request) throws UnAuthException, NotActivateAccountException {
 
         Document user = getUserWithOutCheckCompleteness(request);
-        System.out.println(user);
 
         try {
             PairValue p = jwtTokenProvider.createToken(user);
@@ -223,6 +222,25 @@ public class ChatController extends Router {
         );
     }
 
+    @GetMapping(value = "/api/getMyAdvisors")
+    @ResponseBody
+    public String getMyAdvisors(HttpServletRequest request)
+            throws UnAuthException {
+
+        HashMap<String, Object> user = getClaims(request);
+        if (isAdvisor((List<String>) user.get("accesses")))
+            return JSON_NOT_ACCESS;
+
+        final List<Target> wanted = (List<Target>) user.get("targets");
+
+        if (wanted.size() == 0)
+            return JSON_NOT_ACCESS;
+
+        return Utility.generateSuccessMsg(
+                "advisors", Target.toJSONArray(wanted)
+        );
+    }
+
     @GetMapping(value = "/api/chats")
     @ResponseBody
     public String getChats(HttpServletRequest request)
@@ -343,36 +361,6 @@ public class ChatController extends Router {
                     .put("originalFilename", originalFilename)
                     .put("createdAt", msg.getLong("created_at"))
             );
-        }
-
-        return Utility.generateSuccessMsg(
-                new PairValue("chats", jsonArray)
-        );
-    }
-
-    @GetMapping(value = "/api/search")
-    @ResponseBody
-    public String search(HttpServletRequest request,
-                         @RequestParam @NotBlank String key)
-            throws UnAuthException {
-
-        HashMap<String, Object> user = getClaims(request);
-
-        List<Target> targets = (List<Target>) user.get("targets");
-        JSONArray jsonArray = new JSONArray();
-
-        for (Target t : targets) {
-
-            if (!t.getTargetName().contains(key))
-                continue;
-
-            JSONObject jsonObject = new JSONObject()
-                    .put("receiverName", t.getTargetName())
-                    .put("receiverId", t.getTargetId())
-                    .put("pic", t.getPicUrl())
-                    .put("newMsgs", 0);
-
-            jsonArray.put(jsonObject);
         }
 
         return Utility.generateSuccessMsg(
@@ -536,30 +524,17 @@ public class ChatController extends Router {
                         if (chatRoom == null)
                             return;
 
-                        if (chatRoom.getString("mode").equals("peer")) {
+                        if (!chatRoom.getObjectId("sender_id").equals(senderId) &&
+                                !chatRoom.getObjectId("receiver_id").equals(senderId)
+                        )
+                            return;
 
-                            if (!chatRoom.getObjectId("sender_id").equals(senderId) &&
-                                    !chatRoom.getObjectId("receiver_id").equals(senderId)
-                            )
-                                return;
-
-                            if (chatRoom.getObjectId("sender_id").equals(senderId)) {
-                                chatRoom.put("last_seen", curr);
-                                chatRoom.put("new_msgs", 0);
-                            } else {
-                                chatRoom.put("last_seen_rev", curr);
-                                chatRoom.put("new_msgs_rev", 0);
-                            }
-
+                        if (chatRoom.getObjectId("sender_id").equals(senderId)) {
+                            chatRoom.put("last_seen", curr);
+                            chatRoom.put("new_msgs", 0);
                         } else {
-
-                            List<Document> persons = chatRoom.getList("persons", Document.class);
-                            Document doc = Utility.searchInDocumentsKeyVal(persons, "user_id", senderId);
-                            if (doc == null)
-                                return;
-
-                            doc.put("seen", chatRoom.getInteger("new_msgs"));
-                            doc.put("last_seen", curr);
+                            chatRoom.put("last_seen_rev", curr);
+                            chatRoom.put("new_msgs_rev", 0);
                         }
 
                         update(curr, chatRoom);
@@ -577,27 +552,16 @@ public class ChatController extends Router {
                     if (chatRoom == null)
                         return;
 
-                    if (chatRoom.getString("mode").equals("peer")) {
+                    if (!chatRoom.getObjectId("sender_id").equals(senderId) &&
+                            !chatRoom.getObjectId("receiver_id").equals(senderId)
+                    )
+                        return;
 
-                        if (!chatRoom.getObjectId("sender_id").equals(senderId) &&
-                                !chatRoom.getObjectId("receiver_id").equals(senderId)
-                        )
-                            return;
+                    if (chatRoom.getObjectId("sender_id").equals(senderId))
+                        chatRoom.put("last_seen", chatRoom.getLong("last_seen") - UPDATE_BACK_PERIOD_MSEC);
+                    else
+                        chatRoom.put("last_seen_rev", chatRoom.getLong("last_seen_rev") - UPDATE_BACK_PERIOD_MSEC);
 
-                        if (chatRoom.getObjectId("sender_id").equals(senderId))
-                            chatRoom.put("last_seen", chatRoom.getLong("last_seen") - UPDATE_BACK_PERIOD_MSEC);
-                        else
-                            chatRoom.put("last_seen_rev", chatRoom.getLong("last_seen_rev") - UPDATE_BACK_PERIOD_MSEC);
-
-                    } else {
-
-                        List<Document> persons = chatRoom.getList("persons", Document.class);
-                        Document doc = Utility.searchInDocumentsKeyVal(persons, "user_id", senderId);
-                        if (doc == null)
-                            return;
-
-                        doc.put("last_seen", doc.getLong("last_seen") - UPDATE_BACK_PERIOD_MSEC);
-                    }
 
                     update(curr, chatRoom);
                     return;
@@ -642,7 +606,6 @@ public class ChatController extends Router {
 
         boolean amIStarter;
         long lastSeenTarget;
-        List<Document> persons = null;
         String senderIdStr = senderId.toString();
 
         if (!chatRoom.getObjectId("sender_id").equals(senderId) &&
@@ -704,12 +667,10 @@ public class ChatController extends Router {
                 );
             }
 
-
         }
 
         messagingTemplate.convertAndSend(
-                "/chat/" + chatRoom.getObjectId("_id"),
-                chatMessage
+                "/chat/" + chatRoom.getObjectId("_id"), chatMessage
         );
 
         update(curr, chatRoom);
@@ -720,6 +681,8 @@ public class ChatController extends Router {
                                      String senderName,
                                      int newMsgs,
                                      ChatMessage chatMessage) {
+
+        System.out.println("Sending notif");
 
         messagingTemplate.convertAndSend(
                 "/chat/" + postfix,

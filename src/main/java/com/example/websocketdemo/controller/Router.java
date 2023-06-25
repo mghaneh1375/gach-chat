@@ -19,6 +19,8 @@ import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.List;
 
+import static com.example.websocketdemo.WebsocketDemoApplication.chatRoomRepository;
+
 public class Router {
 
     @Autowired
@@ -102,7 +104,7 @@ public class Router {
         throw new UnAuthException("Token is not valid");
     }
 
-    void getUserWithToken(String token, String claimId, String targetId) {
+    void getUserWithToken(String token, String claimId, String chatId) {
 
         boolean isAuth = jwtTokenFilter.isAuth(token, true);
 
@@ -115,10 +117,20 @@ public class Router {
                 throw new AuthenticationCredentialsNotFoundException("Has no access");
             }
 
-            if (targetId != null && Target.searchInTargets(
-                    (List<Target>) user.get("targets"), new ObjectId(targetId)
-            ) != null)
-                throw new AuthenticationCredentialsNotFoundException("Has no access");
+//            if (targetId != null && Target.searchInTargets(
+//                    (List<Target>) user.get("targets"), new ObjectId(targetId)
+//            ) == null)
+//                throw new AuthenticationCredentialsNotFoundException("Has no access");
+
+            if (chatId != null) {
+
+                Document chat = chatRoomRepository.findById(new ObjectId(chatId));
+                if(chat == null || (
+                        !chat.getObjectId("sender_id").equals(userId) &&
+                                !chat.getObjectId("receiver_id").equals(userId)
+                ))
+                    throw new AuthenticationCredentialsNotFoundException("Has no access");
+            }
 
             return;
         }

@@ -34,17 +34,6 @@ public class ChatNotification {
         this.senderId = chatMessage.getSenderId();
     }
 
-    public ChatNotification(String senderName, String senderId,
-                            int count, ChatMessage chatMessage) {
-        System.out.println(senderId);
-        this.senderName = senderName;
-        this.chatId = chatMessage.getChatId();
-        this.senderId = senderId;
-        this.count = count;
-        this.type = "NOTIF";
-        this.chatMessage = chatMessage;
-    }
-
     public ChatMessage getChatMessage() {
         return chatMessage;
     }

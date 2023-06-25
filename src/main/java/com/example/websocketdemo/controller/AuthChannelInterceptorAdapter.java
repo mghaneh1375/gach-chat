@@ -36,10 +36,7 @@ public class AuthChannelInterceptorAdapter extends Router implements ChannelInte
             throw new AuthenticationCredentialsNotFoundException("too many request");
         }
 
-        System.out.println(accessor.getCommand());
-
         if (StompCommand.CONNECT == accessor.getCommand()) {
-            System.out.println(accessor.toString());
 //            System.out.println(accessor.getFirstNativeHeader("token"));
 //            accessor.setUser(webSocketAuthenticatorService.getAuthenticatedOrFail(accessor.getFirstNativeHeader("token")));
 //            System.out.println("success");
@@ -51,6 +48,7 @@ public class AuthChannelInterceptorAdapter extends Router implements ChannelInte
             } else {
 
                 String[] splited = accessor.getHeader("simpDestination").toString().split("/");
+
                 getUserWithToken(
                         accessor.getFirstNativeHeader("token"), null,
                         splited[splited.length - 1]

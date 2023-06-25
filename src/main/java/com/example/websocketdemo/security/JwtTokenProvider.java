@@ -116,10 +116,6 @@ public class JwtTokenProvider {
                 user.getString("phone") :
                 user.getString("mail");
 
-        System.out.println("Creating token");
-        System.out.println(username);
-        System.out.println(user);
-
         Claims claims = Jwts.claims().setSubject(username);
 
         claims.put("user_id", userId.toString());

@@ -4,9 +4,7 @@ import org.json.JSONObject;
 
 public class Statics {
 
-    public final static String STATICS_SERVER = "https://statics.okft.org/";
-//    public final static String STATICS_SERVER = "http://185.239.106.26:8083/";
-//    public final static String STATICS_SERVER = "http://192.168.0.106/";
+    public final static String STATICS_SERVER = "https://statics.irysc.com/";
 
     public final static boolean DEV_MODE = true;
     public static final long ONE_DAY_MIL_SEC = 86400000;
